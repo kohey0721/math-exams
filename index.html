@@ -235,6 +235,11 @@ input[type="checkbox"],input[type="radio"]{accent-color:var(--text);width:13px;h
   /* App header */
   .app-title{font-size:1rem}
   .app-subtitle{font-size:.55rem}
+  /* Preset */
+  .preset-save-row input[type="text"]{padding:8px 10px;font-size:.84rem;min-height:40px}
+  .preset-save-row button{padding:8px 14px;font-size:.78rem;min-height:40px}
+  .preset-item{padding:8px 0;font-size:.82rem}
+  .preset-item button{padding:4px 12px;font-size:.72rem;min-height:36px}
 }
 @media print{
   @page{margin:15mm 12mm}
@@ -254,6 +259,20 @@ input[type="checkbox"],input[type="radio"]{accent-color:var(--text);width:13px;h
   .answer-key-header{border-bottom:1px solid #000;margin-bottom:14px;padding-bottom:8px}
   .answer-key-item{page-break-inside:avoid;margin-bottom:8px;padding-bottom:8px;border-bottom:1px solid #ccc}
 }
+/* Preset */
+.preset-save-row{display:flex;gap:6px;margin-bottom:8px}
+.preset-save-row input[type="text"]{flex:1;padding:4px 8px;border:1px solid var(--border);border-radius:var(--radius);font-size:.75rem;font-family:var(--font);color:var(--text)}
+.preset-save-row input[type="text"]:focus{outline:none;border-color:var(--text-2)}
+.preset-save-row button{padding:4px 12px;border:1px solid var(--border);background:transparent;border-radius:var(--radius);font-size:.72rem;font-weight:600;cursor:pointer;color:var(--text-2);transition:all .15s;font-family:var(--font);white-space:nowrap}
+.preset-save-row button:hover{color:var(--text);border-color:var(--text-2)}
+.preset-item{display:flex;align-items:center;gap:6px;padding:4px 0;font-size:.75rem;color:var(--text-2)}
+.preset-item .preset-name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.preset-item button{padding:2px 8px;border:1px solid var(--border);background:transparent;border-radius:3px;font-size:.65rem;cursor:pointer;color:var(--text-3);transition:color .1s;font-family:var(--font)}
+.preset-item button:hover{color:var(--text);border-color:var(--text-2)}
+.preset-item .preset-del{color:var(--diff-4);border-color:transparent}
+.preset-item .preset-del:hover{border-color:var(--diff-4)}
+.preset-empty{font-size:.7rem;color:var(--text-3);padding:4px 0}
+
 .hidden{display:none!important}
 </style>
 </head>
@@ -268,6 +287,17 @@ input[type="checkbox"],input[type="radio"]{accent-color:var(--text);width:13px;h
     <div class="mode-toggle">
       <label><input type="radio" name="mode" value="manual" checked><span>手動モード</span></label>
       <label><input type="radio" name="mode" value="auto"><span>おまかせモード</span></label>
+    </div>
+
+    <div class="panel-section">
+      <div class="section-label">プリセット</div>
+      <div class="section-body">
+        <div class="preset-save-row">
+          <input type="text" id="preset-name" placeholder="名前を入力…">
+          <button id="btn-save-preset">保存</button>
+        </div>
+        <div id="preset-list"></div>
+      </div>
     </div>
 
     <!-- Manual Mode -->
@@ -678,6 +708,13 @@ window.addEventListener('afterprint', () => {
   uniformScaleImages(); // Restore screen scaling
 });
 
+// Re-scale images on orientation change or window resize
+let resizeTimer;
+window.addEventListener('resize', () => {
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(() => uniformScaleImages(), 150);
+});
+
 function renderQuestionCard(q, num, ansClass) {
   const displayId = q.type === '大問' ? `${q.type}${q.id}` : q.id;
   const subs = getSubImagesToShow(q.subImages);
@@ -704,6 +741,108 @@ function renderQuestionCard(q, num, ansClass) {
   }
   h += '</div>';
   return h;
+}
+
+// ─── PRESET ───
+function serializeSettings() {
+  return {
+    mode: getMode(),
+    subjectsManual: [...document.querySelectorAll('#subject-checks-manual input:checked')].map(c => c.value),
+    subjectsAuto: [...document.querySelectorAll('#subject-checks-auto input:checked')].map(c => c.value),
+    questionsManual: [...document.querySelectorAll('#topic-selectors-manual .question-cb:checked')].map(c => +c.dataset.idx),
+    questionsAuto: [...document.querySelectorAll('#topic-selectors-auto .question-cb:checked')].map(c => +c.dataset.idx),
+    countManual: +document.getElementById('count-slider').value,
+    countAuto: +document.getElementById('auto-count-slider').value,
+    subMode: document.querySelector('input[name="sub-mode"]:checked').value,
+    subN: +document.getElementById('sub-n').value,
+    autoSubMode: document.querySelector('input[name="auto-sub-mode"]:checked').value,
+    autoSubN: +document.getElementById('auto-sub-n').value,
+    answerSpace: document.getElementById('answer-space-toggle').checked,
+    answerSize: document.querySelector('input[name="answer-size"]:checked').value,
+    ratios: { ...ratios }
+  };
+}
+
+function applySettings(obj) {
+  // Mode
+  const modeRadio = document.querySelector(`input[name="mode"][value="${obj.mode}"]`);
+  if (modeRadio) { modeRadio.checked = true; modeRadio.dispatchEvent(new Event('change')); }
+
+  // Subject checkboxes
+  for (const [panelId, saved] of [['subject-checks-manual', obj.subjectsManual], ['subject-checks-auto', obj.subjectsAuto]]) {
+    if (!saved) continue;
+    document.querySelectorAll(`#${panelId} input[type="checkbox"]`).forEach(cb => {
+      cb.checked = saved.includes(cb.value);
+    });
+  }
+
+  // Question checkboxes + parent sync
+  for (const [containerId, saved] of [['topic-selectors-manual', obj.questionsManual], ['topic-selectors-auto', obj.questionsAuto]]) {
+    if (!saved) continue;
+    const set = new Set(saved);
+    document.querySelectorAll(`#${containerId} .question-cb`).forEach(cb => {
+      cb.checked = set.has(+cb.dataset.idx);
+    });
+    document.querySelectorAll(`#${containerId} .topic-group`).forEach(g => {
+      const parentCb = g.querySelector('.topic-parent-cb');
+      const children = g.querySelector('.topic-children');
+      if (parentCb && children) syncParentState(parentCb, children);
+    });
+  }
+
+  // Sliders
+  document.getElementById('count-slider').value = obj.countManual || 10;
+  document.getElementById('count-val').textContent = obj.countManual || 10;
+  document.getElementById('auto-count-slider').value = obj.countAuto || 15;
+  document.getElementById('auto-count-val').textContent = obj.countAuto || 15;
+
+  // Sub-mode radios
+  const smRadio = document.querySelector(`input[name="sub-mode"][value="${obj.subMode}"]`);
+  if (smRadio) smRadio.checked = true;
+  document.getElementById('sub-n').value = obj.subN || 2;
+  const asmRadio = document.querySelector(`input[name="auto-sub-mode"][value="${obj.autoSubMode}"]`);
+  if (asmRadio) asmRadio.checked = true;
+  document.getElementById('auto-sub-n').value = obj.autoSubN || 2;
+
+  // Answer space
+  document.getElementById('answer-space-toggle').checked = !!obj.answerSpace;
+  const asRadio = document.querySelector(`input[name="answer-size"][value="${obj.answerSize}"]`);
+  if (asRadio) asRadio.checked = true;
+
+  // Ratios
+  if (obj.ratios) {
+    for (const lv of [1,2,3,4]) {
+      ratios[lv] = obj.ratios[lv] ?? ratios[lv];
+      const slider = document.querySelector(`#ratio-grid input[data-level="${lv}"]`);
+      if (slider) slider.value = ratios[lv];
+      const val = document.getElementById(`ratio-val-${lv}`);
+      if (val) val.textContent = ratios[lv] + '%';
+    }
+    updateRatioBar();
+  }
+
+  updatePoolStats();
+}
+
+function getPresets() {
+  try { return JSON.parse(localStorage.getItem('mathExamPresets')) || {}; } catch { return {}; }
+}
+
+function savePresets(obj) {
+  localStorage.setItem('mathExamPresets', JSON.stringify(obj));
+}
+
+function renderPresetList() {
+  const list = document.getElementById('preset-list');
+  const presets = getPresets();
+  const names = Object.keys(presets);
+  if (names.length === 0) {
+    list.innerHTML = '<div class="preset-empty">保存されたプリセットはありません</div>';
+    return;
+  }
+  list.innerHTML = names.map(name =>
+    `<div class="preset-item"><span class="preset-name">${name.replace(/</g,'&lt;')}</span><button class="preset-load" data-name="${name.replace(/"/g,'&quot;')}">読込</button><button class="preset-del" data-name="${name.replace(/"/g,'&quot;')}">×</button></div>`
+  ).join('');
 }
 
 // ─── UI INIT ───
@@ -770,6 +909,33 @@ function initUI() {
     const toggle = header.querySelector('.q-answer-toggle');
     if (toggle) toggle.textContent = ans.classList.contains('open') ? '解答 ▾' : '解答 ▸';
   });
+
+  // Preset: save
+  document.getElementById('btn-save-preset').addEventListener('click', () => {
+    const name = document.getElementById('preset-name').value.trim();
+    if (!name) return;
+    const presets = getPresets();
+    presets[name] = serializeSettings();
+    savePresets(presets);
+    document.getElementById('preset-name').value = '';
+    renderPresetList();
+  });
+  // Preset: load & delete (event delegation)
+  document.getElementById('preset-list').addEventListener('click', (e) => {
+    const btn = e.target.closest('button');
+    if (!btn) return;
+    const name = btn.dataset.name;
+    if (btn.classList.contains('preset-load')) {
+      const presets = getPresets();
+      if (presets[name]) applySettings(presets[name]);
+    } else if (btn.classList.contains('preset-del')) {
+      const presets = getPresets();
+      delete presets[name];
+      savePresets(presets);
+      renderPresetList();
+    }
+  });
+  renderPresetList();
 
   updatePoolStats();
 }
