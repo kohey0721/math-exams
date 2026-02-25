@@ -174,10 +174,67 @@ input[type="checkbox"],input[type="radio"]{accent-color:var(--text);width:13px;h
 
 .warning{background:var(--diff-3-bg);color:#92400e;padding:8px 12px;border-radius:var(--radius);font-size:.75rem;margin-bottom:14px;border-left:2px solid var(--diff-3)}
 
+/* Mobile drawer toggle */
+.mobile-toggle{display:none}
+
 @media(max-width:768px){
-  .app{grid-template-columns:1fr;height:auto}
-  .sidebar{border-right:none;border-bottom:1px solid var(--border);max-height:50vh}
-  .main{padding:20px 16px}
+  .app{display:flex;flex-direction:column;height:auto;min-height:100vh;min-height:100dvh}
+  .sidebar{border-right:none;border-bottom:1px solid var(--border);max-height:none;overflow-y:visible;padding:16px 14px 90px;gap:12px}
+  .sidebar.collapsed{display:none!important}
+  .main{padding:20px 14px;flex:1}
+  .main-inner{max-width:100%}
+  /* Floating toggle */
+  .mobile-toggle{display:flex;align-items:center;justify-content:center;gap:6px;position:fixed;bottom:16px;left:50%;transform:translateX(-50%);z-index:100;background:var(--text);color:#fff;border:none;border-radius:24px;padding:12px 22px;font-size:.78rem;font-weight:600;font-family:var(--font);letter-spacing:.04em;box-shadow:0 2px 12px rgba(0,0,0,.25);cursor:pointer;transition:opacity .2s}
+  .mobile-toggle:active{opacity:.8}
+  .mobile-toggle .icon{font-size:.9rem}
+  .mobile-toggle.hidden-toggle{display:none!important}
+  /* Sticky bottom action bar */
+  .btn-row{position:fixed;bottom:0;left:0;right:0;z-index:90;background:var(--card);border-top:1px solid var(--border);padding:10px 14px;box-shadow:0 -2px 8px rgba(0,0,0,.06);gap:8px}
+  .sidebar.collapsed ~ .btn-row-spacer{display:none}
+  .btn{padding:12px 16px;font-size:.82rem}
+  /* Larger touch targets */
+  input[type="checkbox"],input[type="radio"]{width:18px;height:18px}
+  .cb-group label,.cb-inline label{padding:8px 4px;font-size:.88rem;gap:10px}
+  .topic-parent{padding:10px 4px;font-size:.84rem;gap:8px;min-height:44px}
+  .topic-toggle{font-size:.55rem;width:14px}
+  .topic-children label{font-size:.82rem;padding:8px 0;gap:8px;min-height:40px}
+  .topic-actions button{font-size:.74rem;padding:6px 14px;min-height:36px}
+  .topic-header{padding:10px 8px;font-size:.84rem;min-height:44px}
+  .topic-hierarchy{max-height:none}
+  .question-id{min-width:60px}
+  .answer-config label{font-size:.84rem;gap:6px;padding:6px 2px}
+  .sub-options label{font-size:.88rem;padding:8px 2px;gap:10px}
+  .sub-n-input{width:48px;padding:6px;font-size:.88rem}
+  .section-label{font-size:.66rem}
+  .section-body{padding:10px 12px}
+  /* Question card mobile */
+  .question-card{padding:0 0 18px 12px;margin-bottom:18px}
+  .question-card-header{gap:5px;margin-bottom:8px}
+  .q-number{font-size:.92rem}
+  .q-id{font-size:.66rem}
+  .q-meta-tag{font-size:.58rem;padding:2px 6px}
+  .diff-badge{font-size:.6rem;padding:2px 6px}
+  .q-answer-toggle{font-size:.68rem;padding:4px 10px}
+  .question-images img{max-width:100%!important;height:auto!important}
+  /* Exam header */
+  .exam-header{margin-bottom:20px;padding-bottom:10px}
+  .exam-title{font-size:1.1rem;letter-spacing:.15em}
+  .exam-meta{font-size:.7rem}
+  /* Slider */
+  .slider-row input[type="range"]{height:6px}
+  .slider-val{font-size:1rem}
+  /* Status bar */
+  .status-bar{font-size:.74rem;padding:10px 14px}
+  .status-bar .num{font-size:.92rem}
+  /* Mode toggle */
+  .mode-toggle span{padding:10px 0;font-size:.8rem}
+  /* Ratio */
+  .ratio-label{font-size:.78rem}
+  .ratio-val{font-size:.78rem}
+  .ratio-grid{gap:6px 10px}
+  /* App header */
+  .app-title{font-size:1rem}
+  .app-subtitle{font-size:.55rem}
 }
 @media print{
   @page{margin:15mm 12mm}
@@ -190,6 +247,7 @@ input[type="checkbox"],input[type="radio"]{accent-color:var(--text);width:13px;h
   .question-card{page-break-inside:avoid;margin-bottom:10px;padding-bottom:10px;border-left:2px solid #999}
   .question-images img{max-width:100%!important;height:auto!important}
   .answer-space{border-color:#ccc}
+  .mobile-toggle{display:none!important}
   .q-answer-toggle{display:none!important}
   .answer-section{display:none!important}
   .answer-key{display:block!important;page-break-before:always}
@@ -305,6 +363,7 @@ input[type="checkbox"],input[type="radio"]{accent-color:var(--text);width:13px;h
     </div>
   </div>
 
+  <button class="mobile-toggle" id="mobile-toggle"><span class="icon">&#9881;</span> 設定を開く</button>
   <div class="main" id="exam-area">
     <div class="main-inner">
       <div class="exam-placeholder">
@@ -680,8 +739,26 @@ function initUI() {
   document.getElementById('btn-generate').addEventListener('click', () => {
     const result = getMode() === 'manual' ? selectQuestionsManual() : selectQuestionsAuto();
     renderExam(result);
+    // Mobile: collapse sidebar and scroll to exam
+    if (window.innerWidth <= 768) {
+      const sb = document.querySelector('.sidebar');
+      sb.classList.add('collapsed');
+      const tog = document.getElementById('mobile-toggle');
+      tog.innerHTML = '<span class="icon">&#9881;</span> 設定を開く';
+      tog.classList.remove('hidden-toggle');
+      document.getElementById('exam-area').scrollIntoView({ behavior: 'smooth' });
+    }
   });
   document.getElementById('btn-print').addEventListener('click', () => window.print());
+  // Mobile toggle — hidden by default (sidebar starts open), shown when collapsed
+  const mobileToggle = document.getElementById('mobile-toggle');
+  mobileToggle.classList.add('hidden-toggle');
+  mobileToggle.addEventListener('click', () => {
+    const sb = document.querySelector('.sidebar');
+    sb.classList.remove('collapsed');
+    mobileToggle.classList.add('hidden-toggle');
+    sb.scrollIntoView({ behavior: 'smooth' });
+  });
   // Answer toggle (event delegation)
   document.getElementById('exam-area').addEventListener('click', (e) => {
     const header = e.target.closest('.question-card-header');
