@@ -1,0 +1,808 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>数学 模擬試験ジェネレーター</title>
+<style>
+:root {
+  --bg: #f6f7f9;
+  --card: #fff;
+  --border: #e5e7eb;
+  --text: #111827;
+  --text-2: #6b7280;
+  --text-3: #9ca3af;
+  --accent: #374151;
+  --accent-hover: #1f2937;
+  --sidebar-w: 320px;
+  --diff-1: #059669; --diff-1-bg: #ecfdf5;
+  --diff-2: #2563eb; --diff-2-bg: #eff6ff;
+  --diff-3: #d97706; --diff-3-bg: #fffbeb;
+  --diff-4: #dc2626; --diff-4-bg: #fef2f2;
+  --radius: 4px;
+  --font-d: "Didot","Bodoni 72","Hiragino Mincho ProN",serif;
+  --font: "Avenir Next","Avenir","Hiragino Sans",-apple-system,sans-serif;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--font);background:var(--bg);color:var(--text);line-height:1.55;font-size:13px;-webkit-font-smoothing:antialiased}
+
+.app{display:grid;grid-template-columns:var(--sidebar-w) 1fr;height:100vh}
+
+/* Sidebar */
+.sidebar{background:var(--card);border-right:1px solid var(--border);overflow-y:auto;padding:20px 16px;display:flex;flex-direction:column;gap:14px}
+.sidebar::-webkit-scrollbar{width:3px}
+.sidebar::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+
+.app-header{text-align:center;padding-bottom:16px;border-bottom:1px solid var(--border);flex-shrink:0}
+.app-title{font-family:var(--font-d);font-size:1.1rem;font-weight:400;letter-spacing:.2em;color:var(--text)}
+.app-subtitle{font-size:.6rem;color:var(--text-3);margin-top:4px;letter-spacing:.12em;text-transform:uppercase;font-weight:500}
+
+/* Mode Toggle */
+.mode-toggle{display:flex;background:var(--bg);border-radius:var(--radius);padding:2px;flex-shrink:0;position:relative;z-index:10}
+.mode-toggle label{flex:1;text-align:center;cursor:pointer;position:relative}
+.mode-toggle input{position:absolute;opacity:0;width:0;height:0}
+.mode-toggle span{display:block;padding:6px 0;font-size:.72rem;font-weight:600;color:var(--text-3);border-radius:calc(var(--radius) - 1px);transition:all .25s;letter-spacing:.04em}
+.mode-toggle input:checked+span{background:var(--text);color:#fff}
+
+/* Sections */
+.panel-section{display:flex;flex-direction:column;gap:3px}
+.section-label{font-size:.6rem;font-weight:600;color:var(--text-3);text-transform:uppercase;letter-spacing:.14em;padding:0 1px}
+.section-body{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:8px 10px}
+
+/* Checkboxes & Radios */
+.cb-group{display:flex;flex-direction:column;gap:0}
+.cb-group label,.cb-inline label{display:flex;align-items:center;gap:7px;font-size:.78rem;cursor:pointer;padding:3px 2px;color:var(--text-2);transition:color .1s}
+.cb-group label:hover,.cb-inline label:hover{color:var(--text)}
+.cb-inline{display:flex;flex-wrap:wrap;gap:1px 10px}
+input[type="checkbox"],input[type="radio"]{accent-color:var(--text);width:13px;height:13px}
+
+/* Topic Accordion */
+.topic-section{margin-bottom:1px}
+.topic-header{display:flex;align-items:center;justify-content:space-between;cursor:pointer;padding:5px 6px;border-radius:3px;font-size:.75rem;font-weight:600;color:var(--text-2);user-select:none;transition:color .1s}
+.topic-header:hover{color:var(--text)}
+.topic-header .arrow{transition:transform .2s;font-size:.5rem;color:var(--text-3)}
+.topic-header.open .arrow{transform:rotate(90deg)}
+.topic-count{font-size:.65rem;font-weight:400;color:var(--text-3);margin-left:3px}
+.topic-list{padding:1px 0 1px 12px;display:none}
+.topic-list.open{display:block}
+.topic-actions{display:flex;gap:5px;margin-bottom:3px}
+.topic-actions button{font-size:.62rem;padding:1px 8px;border:1px solid var(--border);background:transparent;border-radius:3px;cursor:pointer;color:var(--text-3);transition:color .1s}
+.topic-actions button:hover{color:var(--text);border-color:var(--text-2)}
+
+/* Hierarchical question selector */
+.topic-group{margin-bottom:1px}
+.topic-parent{display:flex;align-items:center;gap:4px;padding:3px 2px;cursor:pointer;font-size:.73rem;color:var(--text-2)}
+.topic-parent:hover{color:var(--text)}
+.topic-toggle{font-size:.45rem;width:10px;transition:transform .2s;color:var(--text-3)}
+.topic-toggle.open{transform:rotate(90deg)}
+.topic-children{display:none;padding-left:24px}
+.topic-children.open{display:flex;flex-direction:column}
+.topic-children label{display:flex;align-items:center;gap:4px;font-size:.7rem;padding:1px 0;cursor:pointer;color:var(--text-2)}
+.topic-children label:hover{color:var(--text)}
+.question-id{font-weight:500;min-width:52px}
+.topic-hierarchy{max-height:300px;overflow-y:auto}
+
+/* Difficulty badges */
+.diff-badge{display:inline-flex;align-items:center;padding:1px 7px;border-radius:3px;font-size:.62rem;font-weight:600;letter-spacing:.02em}
+.diff-1{background:var(--diff-1-bg);color:var(--diff-1)}
+.diff-2{background:var(--diff-2-bg);color:var(--diff-2)}
+.diff-3{background:var(--diff-3-bg);color:var(--diff-3)}
+.diff-4{background:var(--diff-4-bg);color:var(--diff-4)}
+
+/* Sliders */
+.slider-row{display:flex;align-items:center;gap:10px}
+.slider-row input[type="range"]{flex:1;accent-color:var(--text);height:3px}
+.slider-val{font-family:var(--font-d);font-size:.95rem;font-weight:400;min-width:30px;text-align:right;color:var(--text);font-variant-numeric:tabular-nums}
+
+/* Ratio */
+.ratio-grid{display:grid;grid-template-columns:auto 1fr auto;gap:4px 8px;align-items:center}
+.ratio-label{font-size:.7rem;font-weight:500}
+.ratio-grid input[type="range"]{accent-color:var(--text);height:2px}
+.ratio-val{font-size:.72rem;font-weight:600;min-width:28px;text-align:right;font-variant-numeric:tabular-nums;color:var(--text-2)}
+.ratio-bar{display:flex;height:4px;border-radius:2px;overflow:hidden;margin-top:6px}
+.ratio-bar-seg{transition:flex .3s ease;min-width:0}
+
+/* Sub & Answer */
+.sub-options label{font-size:.78rem;display:flex;align-items:center;gap:6px;color:var(--text-2)}
+.sub-n-input{width:40px;padding:2px 4px;border:1px solid var(--border);border-radius:3px;font-size:.78rem;text-align:center;font-family:var(--font)}
+.sub-n-input:focus{outline:none;border-color:var(--text-2)}
+.answer-config{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.answer-config label{font-size:.75rem;color:var(--text-2);display:flex;align-items:center;gap:4px;cursor:pointer}
+
+/* Buttons */
+.btn-row{display:flex;gap:6px;flex-shrink:0}
+.btn{padding:8px 12px;border:none;border-radius:var(--radius);font-size:.75rem;font-weight:600;cursor:pointer;transition:all .15s;flex:1;letter-spacing:.03em;font-family:var(--font)}
+.btn:active{transform:scale(.97)}
+.btn-primary{background:var(--text);color:#fff}
+.btn-primary:hover{background:var(--accent-hover)}
+.btn-secondary{background:transparent;color:var(--text-2);border:1px solid var(--border)}
+.btn-secondary:hover{color:var(--text);border-color:var(--text-2)}
+
+/* Status */
+.status-bar{background:var(--bg);border-radius:var(--radius);padding:7px 12px;font-size:.68rem;color:var(--text-3);display:flex;justify-content:space-between;align-items:center;font-weight:500}
+.status-bar .num{font-family:var(--font-d);font-weight:400;font-size:.85rem;color:var(--text)}
+
+/* Main */
+.main{overflow-y:auto;padding:36px;background:#fff}
+.main-inner{max-width:900px;margin:0 auto}
+.exam-placeholder{display:flex;flex-direction:column;align-items:center;justify-content:center;height:60vh;color:var(--text-3);gap:10px}
+.exam-placeholder-icon{font-size:1.6rem;opacity:.15}
+.exam-placeholder-text{font-size:.82rem;letter-spacing:.03em}
+
+.exam-header{margin-bottom:32px;padding-bottom:14px;border-bottom:1px solid var(--text)}
+.exam-title{font-family:var(--font-d);font-size:1.3rem;font-weight:400;letter-spacing:.22em;color:var(--text)}
+.exam-meta{font-size:.72rem;color:var(--text-2);margin-top:5px;letter-spacing:.04em}
+
+/* Question card */
+.question-card{margin-bottom:24px;padding:0 0 24px 16px;border-left:2px solid var(--border);border-bottom:1px solid var(--border);background:#fff}
+.question-card:last-child{border-bottom:none}
+.question-card[data-diff="1"]{border-left-color:var(--diff-1)}
+.question-card[data-diff="2"]{border-left-color:var(--diff-2)}
+.question-card[data-diff="3"]{border-left-color:var(--diff-3)}
+.question-card[data-diff="4"]{border-left-color:var(--diff-4)}
+.question-card-header{display:flex;align-items:center;gap:7px;margin-bottom:12px;flex-wrap:wrap;cursor:pointer;user-select:none}
+.q-number{font-family:var(--font-d);font-size:1rem;font-weight:400;letter-spacing:.06em}
+.q-id{font-size:.68rem;color:var(--text-3)}
+.q-meta-tag{font-size:.6rem;padding:1px 7px;border-radius:3px;font-weight:500}
+.q-subject-tag{background:var(--bg);color:var(--text-2)}
+.q-topic-tag{color:var(--text-3);border:1px solid var(--border)}
+
+/* Images */
+.question-images{display:flex;flex-direction:column;gap:2px;overflow-x:auto}
+.question-images img{width:auto;height:auto;display:block}
+.img-error{background:var(--diff-4-bg);color:var(--diff-4);padding:12px;text-align:center;border-radius:var(--radius);font-size:.78rem}
+
+/* Answer space */
+.answer-space{margin-top:12px;border:1px solid var(--border);border-radius:3px;background:repeating-linear-gradient(to bottom,transparent 0px,transparent 27px,var(--border) 27px,var(--border) 28px);background-position:0 -1px}
+.answer-space-sm{height:112px}
+.answer-space-md{height:196px}
+.answer-space-lg{height:308px}
+
+/* Answer reveal */
+.q-answer-toggle{font-size:.62rem;color:var(--text-3);margin-left:auto;padding:1px 7px;border:1px solid var(--border);border-radius:3px;transition:color .15s}
+.q-answer-toggle:hover{color:var(--text);border-color:var(--text-2)}
+.answer-section{display:none;margin-top:12px;padding-top:12px;border-top:1px dashed var(--border)}
+.answer-section.open{display:block}
+.answer-label{font-size:.68rem;color:var(--text-3);margin-bottom:6px;font-weight:500;letter-spacing:.04em}
+
+/* Answer key (print-only) */
+.answer-key{display:none}
+.answer-key-header{margin-bottom:20px;padding-bottom:10px;border-bottom:1px solid var(--text)}
+.answer-key-item{margin-bottom:14px;border-bottom:1px solid var(--border);padding-bottom:14px}
+.answer-key-item:last-child{border-bottom:none}
+.answer-key-label{font-size:.82rem;font-weight:600;margin-bottom:6px;color:var(--text)}
+
+.warning{background:var(--diff-3-bg);color:#92400e;padding:8px 12px;border-radius:var(--radius);font-size:.75rem;margin-bottom:14px;border-left:2px solid var(--diff-3)}
+
+@media(max-width:768px){
+  .app{grid-template-columns:1fr;height:auto}
+  .sidebar{border-right:none;border-bottom:1px solid var(--border);max-height:50vh}
+  .main{padding:20px 16px}
+}
+@media print{
+  @page{margin:15mm 12mm}
+  body{background:#fff;font-size:12px}
+  .sidebar{display:none!important}
+  .app{display:block}
+  .main{overflow:visible;padding:0;background:#fff}
+  .main-inner{max-width:100%}
+  .exam-header{page-break-after:avoid;margin-bottom:14px;padding-bottom:8px}
+  .question-card{page-break-inside:avoid;margin-bottom:10px;padding-bottom:10px;border-left:2px solid #999}
+  .question-images img{max-width:100%!important;height:auto!important}
+  .answer-space{border-color:#ccc}
+  .q-answer-toggle{display:none!important}
+  .answer-section{display:none!important}
+  .answer-key{display:block!important;page-break-before:always}
+  .answer-key-header{border-bottom:1px solid #000;margin-bottom:14px;padding-bottom:8px}
+  .answer-key-item{page-break-inside:avoid;margin-bottom:8px;padding-bottom:8px;border-bottom:1px solid #ccc}
+}
+.hidden{display:none!important}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="sidebar">
+    <div class="app-header">
+      <div class="app-title">模擬試験ジェネレーター</div>
+      <div class="app-subtitle">Mathematics Exam Generator</div>
+    </div>
+
+    <div class="mode-toggle">
+      <label><input type="radio" name="mode" value="manual" checked><span>手動モード</span></label>
+      <label><input type="radio" name="mode" value="auto"><span>おまかせモード</span></label>
+    </div>
+
+    <!-- Manual Mode -->
+    <div id="panel-manual">
+      <div class="panel-section">
+        <div class="section-label">科目</div>
+        <div class="section-body"><div class="cb-inline" id="subject-checks-manual"></div></div>
+      </div>
+      <div class="panel-section">
+        <div class="section-label">トピック</div>
+        <div class="section-body topic-hierarchy" id="topic-selectors-manual"></div>
+      </div>
+      <div class="panel-section">
+        <div class="section-label">出題数</div>
+        <div class="section-body">
+          <div class="slider-row">
+            <input type="range" id="count-slider" min="1" max="184" value="10">
+            <span class="slider-val" id="count-val">10</span>
+          </div>
+        </div>
+      </div>
+      <div class="panel-section">
+        <div class="section-label">小問の扱い</div>
+        <div class="section-body">
+          <div class="cb-group sub-options">
+            <label><input type="radio" name="sub-mode" value="all" checked> すべて表示</label>
+            <label><input type="radio" name="sub-mode" value="random"> ランダム <input type="number" class="sub-n-input" id="sub-n" value="2" min="1" max="20"> 問</label>
+            <label><input type="radio" name="sub-mode" value="none"> 大問のみ</label>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Auto Mode -->
+    <div id="panel-auto" class="hidden">
+      <div class="panel-section">
+        <div class="section-label">科目</div>
+        <div class="section-body"><div class="cb-inline" id="subject-checks-auto"></div></div>
+      </div>
+      <div class="panel-section">
+        <div class="section-label">トピック</div>
+        <div class="section-body topic-hierarchy" id="topic-selectors-auto"></div>
+      </div>
+      <div class="panel-section">
+        <div class="section-label">難易度の比率</div>
+        <div class="section-body">
+          <div class="ratio-grid" id="ratio-grid"></div>
+          <div class="ratio-bar" id="ratio-bar"></div>
+        </div>
+      </div>
+      <div class="panel-section">
+        <div class="section-label">出題数</div>
+        <div class="section-body">
+          <div class="slider-row">
+            <input type="range" id="auto-count-slider" min="1" max="184" value="15">
+            <span class="slider-val" id="auto-count-val">15</span>
+          </div>
+        </div>
+      </div>
+      <div class="panel-section">
+        <div class="section-label">小問の扱い</div>
+        <div class="section-body">
+          <div class="cb-group sub-options">
+            <label><input type="radio" name="auto-sub-mode" value="all" checked> すべて表示</label>
+            <label><input type="radio" name="auto-sub-mode" value="random"> ランダム <input type="number" class="sub-n-input" id="auto-sub-n" value="2" min="1" max="20"> 問</label>
+            <label><input type="radio" name="auto-sub-mode" value="none"> 大問のみ</label>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Answer space -->
+    <div class="panel-section">
+      <div class="section-label">回答スペース</div>
+      <div class="section-body">
+        <div class="answer-config">
+          <label><input type="checkbox" id="answer-space-toggle"> 追加する</label>
+          <label><input type="radio" name="answer-size" value="sm" checked> 小</label>
+          <label><input type="radio" name="answer-size" value="md"> 中</label>
+          <label><input type="radio" name="answer-size" value="lg"> 大</label>
+        </div>
+      </div>
+    </div>
+
+    <div class="status-bar">
+      <span>対象: <span class="num" id="pool-count">0</span> 問</span>
+      <span>平均難易度: <span class="num" id="pool-avg">-</span></span>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn btn-primary" id="btn-generate">試験を生成</button>
+      <button class="btn btn-secondary" id="btn-print">PDF / 印刷</button>
+    </div>
+  </div>
+
+  <div class="main" id="exam-area">
+    <div class="main-inner">
+      <div class="exam-placeholder">
+        <div class="exam-placeholder-icon">&#9998;</div>
+        <div class="exam-placeholder-text">条件を設定して「試験を生成」を押してください</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ─── DATABASE ───
+const DB={subjects:{"数学α":{name:"数学α",subtitle:"指数・対数",topics:{"指数の拡張":{name:"指数の拡張",questions:[{id:"325",type:"大問",difficulty:1,mainImage:"data/数学α/大問325/20260225_130401.png",subImages:["data/数学α/大問325/小問/20260225_130406.png","data/数学α/大問325/小問/20260225_130411.png","data/数学α/大問325/小問/20260225_130413.png","data/数学α/大問325/小問/20260225_130416.png"]},{id:"326",type:"大問",difficulty:1,mainImage:"data/数学α/大問326/20260225_130418.png",subImages:["data/数学α/大問326/小問/20260225_130421.png","data/数学α/大問326/小問/20260225_130424.png","data/数学α/大問326/小問/20260225_130429.png","data/数学α/大問326/小問/20260225_130431.png","data/数学α/大問326/小問/20260225_130434.png","data/数学α/大問326/小問/20260225_130437.png"]},{id:"327",type:"大問",difficulty:1,mainImage:"data/数学α/大問327/20260225_130440.png",subImages:["data/数学α/大問327/小問/20260225_130445.png","data/数学α/大問327/小問/20260225_130454.png","data/数学α/大問327/小問/20260225_130457.png"]},{id:"328",type:"大問",difficulty:1,mainImage:"data/数学α/大問328/20260225_130501.png",subImages:["data/数学α/大問328/小問/20260225_130504.png","data/数学α/大問328/小問/20260225_130507.png","data/数学α/大問328/小問/20260225_130510.png"]},{id:"329",type:"大問",difficulty:1,mainImage:"data/数学α/大問329/20260225_130514.png",subImages:["data/数学α/大問329/小問/20260225_130518.png","data/数学α/大問329/小問/20260225_130521.png","data/数学α/大問329/小問/20260225_130525.png","data/数学α/大問329/小問/20260225_130528.png","data/数学α/大問329/小問/20260225_130530.png","data/数学α/大問329/小問/20260225_130534.png"]},{id:"330",type:"大問",difficulty:1,mainImage:"data/数学α/大問330/20260225_130537.png",subImages:["data/数学α/大問330/小問/20260225_130540.png","data/数学α/大問330/小問/20260225_130543.png","data/数学α/大問330/小問/20260225_130549.png","data/数学α/大問330/小問/20260225_130551.png"]},{id:"331",type:"大問",difficulty:1,mainImage:"data/数学α/大問331/20260225_130554.png",subImages:["data/数学α/大問331/小問/20260225_130557.png","data/数学α/大問331/小問/20260225_130559.png","data/数学α/大問331/小問/20260225_130602.png","data/数学α/大問331/小問/20260225_130604.png"]},{id:"332",type:"大問",difficulty:1,mainImage:"data/数学α/大問332/20260225_130608.png",subImages:["data/数学α/大問332/小問/20260225_130611.png","data/数学α/大問332/小問/20260225_130613.png","data/数学α/大問332/小問/20260225_130616.png","data/数学α/大問332/小問/20260225_130620.png"]},{id:"333",type:"大問",difficulty:1,mainImage:"data/数学α/大問333/20260225_130623.png",subImages:["data/数学α/大問333/小問/20260225_130627.png","data/数学α/大問333/小問/20260225_130630.png","data/数学α/大問333/小問/20260225_130635.png"]},{id:"334",type:"大問",difficulty:1,mainImage:"data/数学α/大問334/20260225_130638.png",subImages:["data/数学α/大問334/小問/20260225_130641.png","data/数学α/大問334/小問/20260225_130644.png","data/数学α/大問334/小問/20260225_130646.png"]},{id:"335",type:"大問",difficulty:2,mainImage:"data/数学α/大問335/20260225_130655.png",subImages:["data/数学α/大問335/小問/20260225_130700.png","data/数学α/大問335/小問/20260225_130703.png"]},{id:"336",type:"大問",difficulty:2,mainImage:"data/数学α/大問336/20260225_130707.png",subImages:["data/数学α/大問336/小問/20260225_130710.png","data/数学α/大問336/小問/20260225_130714.png"]},{id:"337",type:"大問",difficulty:2,mainImage:"data/数学α/大問337/20260225_130718.png",subImages:["data/数学α/大問337/小問/20260225_130723.png","data/数学α/大問337/小問/20260225_130726.png","data/数学α/大問337/小問/20260225_130729.png","data/数学α/大問337/小問/20260225_130732.png"]},{id:"338",type:"大問",difficulty:2,mainImage:"data/数学α/大問338/20260225_130740.png",subImages:[]},{id:"339",type:"大問",difficulty:2,mainImage:"data/数学α/大問339/20260225_130744.png",subImages:[]},{id:"340",type:"大問",difficulty:2,mainImage:"data/数学α/大問340/20260225_130747.png",subImages:[]},{id:"341",type:"大問",difficulty:2,mainImage:"data/数学α/大問341/20260225_130751.png",subImages:[]}]},"指数関数":{name:"指数関数",questions:[{id:"342",type:"大問",difficulty:1,mainImage:"data/数学α/大問342/20260225_130809.png",subImages:["data/数学α/大問342/小問/20260225_130814.png","data/数学α/大問342/小問/20260225_130816.png","data/数学α/大問342/小問/20260225_130818.png","data/数学α/大問342/小問/20260225_130821.png"]},{id:"343",type:"大問",difficulty:1,mainImage:"data/数学α/大問343/20260225_130823.png",subImages:["data/数学α/大問343/小問/20260225_130827.png","data/数学α/大問343/小問/20260225_130830.png"]},{id:"344",type:"大問",difficulty:1,mainImage:"data/数学α/大問344/20260225_130833.png",subImages:["data/数学α/大問344/小問/20260225_130837.png","data/数学α/大問344/小問/20260225_130840.png"]},{id:"345",type:"大問",difficulty:1,mainImage:"data/数学α/大問345/20260225_130843.png",subImages:["data/数学α/大問345/小問/20260225_130846.png","data/数学α/大問345/小問/20260225_130849.png","data/数学α/大問345/小問/20260225_130852.png","data/数学α/大問345/小問/20260225_130855.png","data/数学α/大問345/小問/20260225_130858.png","data/数学α/大問345/小問/20260225_130900.png","data/数学α/大問345/小問/20260225_130905.png","data/数学α/大問345/小問/20260225_130909.png"]},{id:"346",type:"大問",difficulty:1,mainImage:"data/数学α/大問346/20260225_130913.png",subImages:["data/数学α/大問346/小問/20260225_130916.png","data/数学α/大問346/小問/20260225_130921.png","data/数学α/大問346/小問/20260225_130924.png","data/数学α/大問346/小問/20260225_130927.png"]},{id:"347",type:"大問",difficulty:2,mainImage:"data/数学α/大問347/20260225_130933.png",subImages:["data/数学α/大問347/小問/20260225_130937.png","data/数学α/大問347/小問/20260225_130940.png","data/数学α/大問347/小問/20260225_130943.png","data/数学α/大問347/小問/20260225_130946.png"]},{id:"348",type:"大問",difficulty:2,mainImage:"data/数学α/大問348/20260225_130949.png",subImages:["data/数学α/大問348/小問/20260225_130953.png","data/数学α/大問348/小問/20260225_130956.png"]},{id:"349",type:"大問",difficulty:2,mainImage:"data/数学α/大問349/20260225_131001.png",subImages:["data/数学α/大問349/小問/20260225_131004.png","data/数学α/大問349/小問/20260225_131007.png","data/数学α/大問349/小問/20260225_131010.png","data/数学α/大問349/小問/20260225_131012.png","data/数学α/大問349/小問/20260225_131014.png","data/数学α/大問349/小問/20260225_131017.png"]},{id:"350",type:"大問",difficulty:2,mainImage:"data/数学α/大問350/20260225_131020.png",subImages:["data/数学α/大問350/小問/20260225_131025.png","data/数学α/大問350/小問/20260225_131028.png"]},{id:"351",type:"大問",difficulty:4,mainImage:"data/数学α/大問351/20260225_131034.png",subImages:["data/数学α/大問351/小問/20260225_131037.png","data/数学α/大問351/小問/20260225_131039.png"]},{id:"352",type:"大問",difficulty:4,mainImage:"data/数学α/大問352/20260225_131042.png",subImages:[]}]},"対数とその性質":{name:"対数とその性質",questions:[{id:"353",type:"大問",difficulty:1,mainImage:"data/数学α/大問353/20260225_131048.png",subImages:["data/数学α/大問353/小問/20260225_131052.png","data/数学α/大問353/小問/20260225_131055.png","data/数学α/大問353/小問/20260225_131057.png","data/数学α/大問353/小問/20260225_131100.png","data/数学α/大問353/小問/20260225_131103.png","data/数学α/大問353/小問/20260225_131106.png","data/数学α/大問353/小問/20260225_131108.png","data/数学α/大問353/小問/20260225_131111.png"]},{id:"354",type:"大問",difficulty:1,mainImage:"data/数学α/大問354/20260225_131114.png",subImages:["data/数学α/大問354/小問/20260225_131118.png","data/数学α/大問354/小問/20260225_131121.png","data/数学α/大問354/小問/20260225_131124.png","data/数学α/大問354/小問/20260225_131126.png","data/数学α/大問354/小問/20260225_131129.png","data/数学α/大問354/小問/20260225_131131.png","data/数学α/大問354/小問/20260225_131134.png","data/数学α/大問354/小問/20260225_131136.png"]},{id:"355",type:"大問",difficulty:1,mainImage:"data/数学α/大問355/20260225_131145.png",subImages:["data/数学α/大問355/小問/20260225_131148.png","data/数学α/大問355/小問/20260225_131151.png","data/数学α/大問355/小問/20260225_131154.png","data/数学α/大問355/小問/20260225_131157.png","data/数学α/大問355/小問/20260225_131200.png"]},{id:"356",type:"大問",difficulty:1,mainImage:"data/数学α/大問356/20260225_131202.png",subImages:["data/数学α/大問356/小問/20260225_131206.png","data/数学α/大問356/小問/20260225_131209.png","data/数学α/大問356/小問/20260225_131212.png","data/数学α/大問356/小問/20260225_131214.png","data/数学α/大問356/小問/20260225_131217.png","data/数学α/大問356/小問/20260225_131220.png"]},{id:"357",type:"大問",difficulty:1,mainImage:"data/数学α/大問357/20260225_131223.png",subImages:["data/数学α/大問357/小問/20260225_131227.png","data/数学α/大問357/小問/20260225_131230.png"]},{id:"358",type:"大問",difficulty:2,mainImage:"data/数学α/大問358/20260225_131235.png",subImages:["data/数学α/大問358/小問/20260225_131239.png","data/数学α/大問358/小問/20260225_131241.png","data/数学α/大問358/小問/20260225_131244.png"]},{id:"359",type:"大問",difficulty:2,mainImage:"data/数学α/大問359/20260225_131247.png",subImages:["data/数学α/大問359/小問/20260225_131252.png","data/数学α/大問359/小問/20260225_131255.png","data/数学α/大問359/小問/20260225_131258.png"]},{id:"360",type:"大問",difficulty:2,mainImage:"data/数学α/大問360/20260225_131302.png",subImages:["data/数学α/大問360/小問/20260225_131311.png","data/数学α/大問360/小問/20260225_131314.png","data/数学α/大問360/小問/20260225_131316.png"]},{id:"361",type:"大問",difficulty:2,mainImage:"data/数学α/大問361/20260225_131319.png",subImages:["data/数学α/大問361/小問/20260225_131323.png","data/数学α/大問361/小問/20260225_131326.png"]},{id:"362",type:"大問",difficulty:2,mainImage:"data/数学α/大問362/20260225_131338.png",subImages:["data/数学α/大問362/小問/20260225_131342.png","data/数学α/大問362/小問/20260225_131345.png","data/数学α/大問362/小問/20260225_131348.png","data/数学α/大問362/小問/20260225_131351.png"]},{id:"363",type:"大問",difficulty:2,mainImage:"data/数学α/大問363/20260225_131354.png",subImages:[]},{id:"364",type:"大問",difficulty:2,mainImage:"data/数学α/大問364/20260225_131359.png",subImages:[]}]},"対数関数":{name:"対数関数",questions:[{id:"365",type:"大問",difficulty:1,mainImage:"data/数学α/大問365/20260225_131404.png",subImages:["data/数学α/大問365/小問/20260225_131409.png","data/数学α/大問365/小問/20260225_131411.png","data/数学α/大問365/小問/20260225_131414.png"]},{id:"366",type:"大問",difficulty:1,mainImage:"data/数学α/大問366/20260225_131417.png",subImages:["data/数学α/大問366/小問/20260225_131420.png","data/数学α/大問366/小問/20260225_131423.png"]},{id:"367",type:"大問",difficulty:1,mainImage:"data/数学α/大問367/20260225_131426.png",subImages:["data/数学α/大問367/小問/20260225_131430.png","data/数学α/大問367/小問/20260225_131434.png"]},{id:"368",type:"大問",difficulty:1,mainImage:"data/数学α/大問368/20260225_131437.png",subImages:["data/数学α/大問368/小問/20260225_131441.png","data/数学α/大問368/小問/20260225_131444.png"]},{id:"369",type:"大問",difficulty:1,mainImage:"data/数学α/大問369/20260225_131448.png",subImages:["data/数学α/大問369/小問/20260225_131451.png","data/数学α/大問369/小問/20260225_131455.png","data/数学α/大問369/小問/20260225_131459.png","data/数学α/大問369/小問/20260225_131504.png","data/数学α/大問369/小問/20260225_131509.png","data/数学α/大問369/小問/20260225_131512.png","data/数学α/大問369/小問/20260225_131518.png","data/数学α/大問369/小問/20260225_131521.png"]},{id:"370",type:"大問",difficulty:2,mainImage:"data/数学α/大問370/20260225_131524.png",subImages:["data/数学α/大問370/小問/20260225_131529.png","data/数学α/大問370/小問/20260225_131532.png","data/数学α/大問370/小問/20260225_131535.png"]},{id:"371",type:"大問",difficulty:2,mainImage:"data/数学α/大問371/20260225_131540.png",subImages:["data/数学α/大問371/小問/20260225_131543.png","data/数学α/大問371/小問/20260225_131546.png","data/数学α/大問371/小問/20260225_131549.png"]},{id:"372",type:"大問",difficulty:2,mainImage:"data/数学α/大問372/20260225_131558.png",subImages:["data/数学α/大問372/小問/20260225_131601.png","data/数学α/大問372/小問/20260225_131604.png"]},{id:"373",type:"大問",difficulty:2,mainImage:"data/数学α/大問373/20260225_131612.png",subImages:["data/数学α/大問373/小問/20260225_131614.png","data/数学α/大問373/小問/20260225_131616.png","data/数学α/大問373/小問/20260225_131619.png"]},{id:"374",type:"大問",difficulty:2,mainImage:"data/数学α/大問374/20260225_131622.png",subImages:["data/数学α/大問374/小問/20260225_131625.png","data/数学α/大問374/小問/20260225_131628.png","data/数学α/大問374/小問/20260225_131631.png"]},{id:"375",type:"大問",difficulty:2,mainImage:"data/数学α/大問375/20260225_131647.png",subImages:["data/数学α/大問375/小問/20260225_131650.png","data/数学α/大問375/小問/20260225_131654.png"]},{id:"376",type:"大問",difficulty:2,mainImage:"data/数学α/大問376/20260225_131656.png",subImages:["data/数学α/大問376/小問/20260225_131659.png","data/数学α/大問376/小問/20260225_131702.png","data/数学α/大問376/小問/20260225_131705.png","data/数学α/大問376/小問/20260225_131709.png"]},{id:"377",type:"大問",difficulty:2,mainImage:"data/数学α/大問377/20260225_131713.png",subImages:["data/数学α/大問377/小問/20260225_131717.png","data/数学α/大問377/小問/20260225_131720.png"]},{id:"378",type:"大問",difficulty:2,mainImage:"data/数学α/大問378/20260225_131723.png",subImages:["data/数学α/大問378/小問/20260225_131728.png","data/数学α/大問378/小問/20260225_131731.png","data/数学α/大問378/小問/20260225_131734.png"]},{id:"379",type:"大問",difficulty:2,mainImage:"data/数学α/大問379/20260225_131737.png",subImages:[]},{id:"380",type:"大問",difficulty:2,mainImage:"data/数学α/大問380/20260225_131745.png",subImages:[]},{id:"381",type:"大問",difficulty:4,mainImage:"data/数学α/大問381/20260225_131750.png",subImages:["data/数学α/大問381/小問/20260225_131754.png","data/数学α/大問381/小問/20260225_131757.png"]},{id:"382",type:"大問",difficulty:4,mainImage:"data/数学α/大問382/20260225_131802.png",subImages:["data/数学α/大問382/小問/20260225_131806.png","data/数学α/大問382/小問/20260225_131809.png"]},{id:"383",type:"大問",difficulty:4,mainImage:"data/数学α/大問383/20260225_131812.png",subImages:[]}]},"常用対数":{name:"常用対数",questions:[{id:"384",type:"大問",difficulty:1,mainImage:"data/数学α/大問384/20260225_131818.png",subImages:["data/数学α/大問384/小問/20260225_131822.png","data/数学α/大問384/小問/20260225_131824.png","data/数学α/大問384/小問/20260225_131827.png"]},{id:"385",type:"大問",difficulty:1,mainImage:"data/数学α/大問385/20260225_131830.png",subImages:["data/数学α/大問385/小問/20260225_131834.png","data/数学α/大問385/小問/20260225_131836.png","data/数学α/大問385/小問/20260225_131839.png"]},{id:"386",type:"大問",difficulty:1,mainImage:"data/数学α/大問386/20260225_131844.png",subImages:["data/数学α/大問386/小問/20260225_131850.png","data/数学α/大問386/小問/20260225_131854.png","data/数学α/大問386/小問/20260225_131857.png","data/数学α/大問386/小問/20260225_131900.png"]},{id:"387",type:"大問",difficulty:1,mainImage:"data/数学α/大問387/20260225_131903.png",subImages:["data/数学α/大問387/小問/20260225_131907.png","data/数学α/大問387/小問/20260225_131910.png","data/数学α/大問387/小問/20260225_131913.png"]},{id:"388",type:"大問",difficulty:1,mainImage:"data/数学α/大問388/20260225_131918.png",subImages:["data/数学α/大問388/小問/20260225_131922.png","data/数学α/大問388/小問/20260225_131925.png","data/数学α/大問388/小問/20260225_131928.png"]},{id:"389",type:"大問",difficulty:1,mainImage:"data/数学α/大問389/20260225_131931.png",subImages:["data/数学α/大問389/小問/20260225_131935.png","data/数学α/大問389/小問/20260225_131938.png"]},{id:"390",type:"大問",difficulty:2,mainImage:"data/数学α/大問390/20260225_131943.png",subImages:["data/数学α/大問390/小問/20260225_131948.png","data/数学α/大問390/小問/20260225_131950.png"]},{id:"391",type:"大問",difficulty:2,mainImage:"data/数学α/大問391/20260225_131954.png",subImages:[]},{id:"392",type:"大問",difficulty:2,mainImage:"data/数学α/大問392/20260225_131959.png",subImages:[]},{id:"393",type:"大問",difficulty:2,mainImage:"data/数学α/大問393/20260225_132005.png",subImages:[]},{id:"394",type:"大問",difficulty:2,mainImage:"data/数学α/大問394/20260225_132010.png",subImages:[]},{id:"395",type:"大問",difficulty:2,mainImage:"data/数学α/大問395/20260225_132017.png",subImages:["data/数学α/大問395/小問/20260225_132021.png","data/数学α/大問395/小問/20260225_132024.png","data/数学α/大問395/小問/20260225_132027.png"]}]},"演習問題":{name:"演習問題",questions:[{id:"演39",type:"演習問題",difficulty:3,mainImage:"data/数学α/演習問題39/20260225_132044.png",subImages:[]},{id:"演40",type:"演習問題",difficulty:3,mainImage:"data/数学α/演習問題40/20260225_132051.png",subImages:[]},{id:"演41",type:"演習問題",difficulty:3,mainImage:"data/数学α/演習問題41/20260225_132055.png",subImages:[]},{id:"演42",type:"演習問題",difficulty:3,mainImage:"data/数学α/演習問題42/20260225_132100.png",subImages:[]},{id:"演43",type:"演習問題",difficulty:3,mainImage:"data/数学α/演習問題43/20260225_132110.png",subImages:[]}]},"総合問題":{name:"総合問題",questions:[{id:"総5",type:"総合問題",difficulty:4,mainImage:"data/数学α/総合問題5/20260225_132129.png",subImages:["data/数学α/総合問題5/小問/20260225_132136.png","data/数学α/総合問題5/小問/20260225_132140.png","data/数学α/総合問題5/小問/20260225_132143.png","data/数学α/総合問題5/小問/20260225_132148.png","data/数学α/総合問題5/小問/20260225_132151.png"]}]},"例題":{name:"例題",questions:[{id:"例33",type:"例題",difficulty:2,mainImage:"data/数学α/例題33/20260225_132220.png",subImages:[]},{id:"例34",type:"例題",difficulty:2,mainImage:"data/数学α/例題34/20260225_132235.png",subImages:[]},{id:"例35",type:"例題",difficulty:2,mainImage:"data/数学α/例題35/20260225_132246.png",subImages:[]},{id:"例36",type:"例題",difficulty:2,mainImage:"data/数学α/例題36/20260225_132256.png",subImages:["data/数学α/例題36/小問/20260225_132300.png","data/数学α/例題36/小問/20260225_132302.png"]},{id:"例37",type:"例題",difficulty:2,mainImage:"data/数学α/例題37/20260225_132309.png",subImages:[]},{id:"例38",type:"例題",difficulty:2,mainImage:"data/数学α/例題38/20260225_132319.png",subImages:[]}]}}},"数学β":{name:"数学β",subtitle:"図形の性質",topics:{"三角形の辺の比":{name:"三角形の辺の比",questions:[{id:"150",type:"大問",difficulty:1,mainImage:"data/数学β/大問150/20260225_121416.png",subImages:[]},{id:"151",type:"大問",difficulty:1,mainImage:"data/数学β/大問151/20260225_121429.png",subImages:["data/数学β/大問151/小問/20260225_121439.png","data/数学β/大問151/小問/20260225_121445.png"]},{id:"152",type:"大問",difficulty:1,mainImage:"data/数学β/大問152/20260225_121451.png",subImages:[]},{id:"153",type:"大問",difficulty:2,mainImage:"data/数学β/大問153/20260225_121508.png",subImages:[]}]},"三角形の外心・内心・重心":{name:"三角形の外心・内心・重心",questions:[{id:"154",type:"大問",difficulty:1,mainImage:"data/数学β/大問154/20260225_121516.png",subImages:["data/数学β/大問154/小問/20260225_121525.png","data/数学β/大問154/小問/20260225_121531.png"]},{id:"155",type:"大問",difficulty:1,mainImage:"data/数学β/大問155/20260225_121535.png",subImages:["data/数学β/大問155/小問/20260225_121541.png","data/数学β/大問155/小問/20260225_121547.png"]},{id:"156",type:"大問",difficulty:1,mainImage:"data/数学β/大問156/20260225_121553.png",subImages:["data/数学β/大問156/小問/20260225_121601.png","data/数学β/大問156/小問/20260225_121605.png"]},{id:"157",type:"大問",difficulty:1,mainImage:"data/数学β/大問157/20260225_121610.png",subImages:[]},{id:"158",type:"大問",difficulty:1,mainImage:"data/数学β/大問158/20260225_121620.png",subImages:[]},{id:"159",type:"大問",difficulty:2,mainImage:"data/数学β/大問159/20260225_121633.png",subImages:[]},{id:"160",type:"大問",difficulty:2,mainImage:"data/数学β/大問160/20260225_121638.png",subImages:[]},{id:"161",type:"大問",difficulty:2,mainImage:"data/数学β/大問161/20260225_121642.png",subImages:[]},{id:"162",type:"大問",difficulty:2,mainImage:"data/数学β/大問162/20260225_121648.png",subImages:["data/数学β/大問162/小問/20260225_121653.png","data/数学β/大問162/小問/20260225_121657.png"]},{id:"163",type:"大問",difficulty:2,mainImage:"data/数学β/大問163/20260225_121705.png",subImages:[]},{id:"164",type:"大問",difficulty:2,mainImage:"data/数学β/大問164/20260225_121710.png",subImages:[]},{id:"165",type:"大問",difficulty:2,mainImage:"data/数学β/大問165/20260225_121716.png",subImages:[]}]},"チェバの定理・メネラウスの定理":{name:"チェバの定理・メネラウスの定理",questions:[{id:"166",type:"大問",difficulty:1,mainImage:"data/数学β/大問166/20260225_121722.png",subImages:["data/数学β/大問166/小問/20260225_121728.png","data/数学β/大問166/小問/20260225_121733.png"]},{id:"167",type:"大問",difficulty:1,mainImage:"data/数学β/大問167/20260225_121736.png",subImages:["data/数学β/大問167/小問/20260225_121741.png","data/数学β/大問167/小問/20260225_121745.png"]},{id:"168",type:"大問",difficulty:1,mainImage:"data/数学β/大問168/20260225_121751.png",subImages:["data/数学β/大問168/小問/20260225_121755.png","data/数学β/大問168/小問/20260225_121758.png"]},{id:"169",type:"大問",difficulty:2,mainImage:"data/数学β/大問169/20260225_121801.png",subImages:["data/数学β/大問169/小問/20260225_121816.png"]},{id:"170",type:"大問",difficulty:2,mainImage:"data/数学β/大問170/20260225_121823.png",subImages:["data/数学β/大問170/小問/20260225_121831.png","data/数学β/大問170/小問/20260225_121837.png"]},{id:"171",type:"大問",difficulty:2,mainImage:"data/数学β/大問171/20260225_121843.png",subImages:["data/数学β/大問171/小問/20260225_121848.png","data/数学β/大問171/小問/20260225_121851.png"]},{id:"172",type:"大問",difficulty:4,mainImage:"data/数学β/大問172/20260225_121855.png",subImages:[]},{id:"173",type:"大問",difficulty:4,mainImage:"data/数学β/大問173/20260225_121901.png",subImages:[]}]},"三角形の辺と角":{name:"三角形の辺と角",questions:[{id:"174",type:"大問",difficulty:1,mainImage:"data/数学β/大問174/20260225_121906.png",subImages:["data/数学β/大問174/小問/20260225_121911.png","data/数学β/大問174/小問/20260225_121915.png","data/数学β/大問174/小問/20260225_121918.png"]},{id:"175",type:"大問",difficulty:1,mainImage:"data/数学β/大問175/20260225_121921.png",subImages:["data/数学β/大問175/小問/20260225_121925.png","data/数学β/大問175/小問/20260225_121928.png","data/数学β/大問175/小問/20260225_121932.png","data/数学β/大問175/小問/20260225_121936.png"]},{id:"176",type:"大問",difficulty:1,mainImage:"data/数学β/大問176/20260225_121940.png",subImages:["data/数学β/大問176/小問/20260225_121944.png","data/数学β/大問176/小問/20260225_121948.png"]},{id:"177",type:"大問",difficulty:2,mainImage:"data/数学β/大問177/20260225_121951.png",subImages:[]},{id:"178",type:"大問",difficulty:2,mainImage:"data/数学β/大問178/20260225_121957.png",subImages:[]},{id:"179",type:"大問",difficulty:2,mainImage:"data/数学β/大問179/20260225_122004.png",subImages:["data/数学β/大問179/小問/20260225_122009.png","data/数学β/大問179/小問/20260225_122012.png"]},{id:"180",type:"大問",difficulty:2,mainImage:"data/数学β/大問180/20260225_122015.png",subImages:[]},{id:"181",type:"大問",difficulty:2,mainImage:"data/数学β/大問181/20260225_122023.png",subImages:[]}]},"円に内接する四角形":{name:"円に内接する四角形",questions:[{id:"182",type:"大問",difficulty:1,mainImage:"data/数学β/大問182/20260225_122026.png",subImages:["data/数学β/大問182/小問/20260225_122031.png","data/数学β/大問182/小問/20260225_122035.png"]},{id:"183",type:"大問",difficulty:1,mainImage:"data/数学β/大問183/20260225_122039.png",subImages:["data/数学β/大問183/小問/20260225_122043.png","data/数学β/大問183/小問/20260225_122046.png","data/数学β/大問183/小問/20260225_122049.png"]},{id:"184",type:"大問",difficulty:1,mainImage:"data/数学β/大問184/20260225_122053.png",subImages:["data/数学β/大問184/小問/20260225_122057.png","data/数学β/大問184/小問/20260225_122101.png"]},{id:"185",type:"大問",difficulty:1,mainImage:"data/数学β/大問185/20260225_122106.png",subImages:["data/数学β/大問185/小問/20260225_122108.png","data/数学β/大問185/小問/20260225_122111.png","data/数学β/大問185/小問/20260225_122114.png"]},{id:"186",type:"大問",difficulty:1,mainImage:"data/数学β/大問186/20260225_122117.png",subImages:["data/数学β/大問186/小問/20260225_122121.png","data/数学β/大問186/小問/20260225_122124.png","data/数学β/大問186/小問/20260225_122127.png"]},{id:"187",type:"大問",difficulty:1,mainImage:"data/数学β/大問187/20260225_122133.png",subImages:[]},{id:"188",type:"大問",difficulty:2,mainImage:"data/数学β/大問188/20260225_122137.png",subImages:[]},{id:"189",type:"大問",difficulty:2,mainImage:"data/数学β/大問189/20260225_122142.png",subImages:[]},{id:"190",type:"大問",difficulty:2,mainImage:"data/数学β/大問190/20260225_122147.png",subImages:["data/数学β/大問190/小問/20260225_122151.png","data/数学β/大問190/小問/20260225_122154.png"]},{id:"191",type:"大問",difficulty:2,mainImage:"data/数学β/大問191/20260225_122158.png",subImages:[]},{id:"192",type:"大問",difficulty:2,mainImage:"data/数学β/大問192/20260225_122201.png",subImages:[]},{id:"193",type:"大問",difficulty:2,mainImage:"data/数学β/大問193/20260225_122205.png",subImages:[]}]},"円と直線":{name:"円と直線",questions:[{id:"194",type:"大問",difficulty:1,mainImage:"data/数学β/大問194/20260225_122210.png",subImages:["data/数学β/大問194/小問/20260225_122214.png","data/数学β/大問194/小問/20260225_122218.png"]},{id:"195",type:"大問",difficulty:1,mainImage:"data/数学β/大問195/20260225_122221.png",subImages:["data/数学β/大問195/小問/20260225_122226.png","data/数学β/大問195/小問/20260225_122230.png"]},{id:"196",type:"大問",difficulty:1,mainImage:"data/数学β/大問196/20260225_122235.png",subImages:[]},{id:"197",type:"大問",difficulty:1,mainImage:"data/数学β/大問197/20260225_122240.png",subImages:["data/数学β/大問197/小問/20260225_122250.png","data/数学β/大問197/小問/20260225_122253.png","data/数学β/大問197/小問/20260225_122255.png"]},{id:"198",type:"大問",difficulty:2,mainImage:"data/数学β/大問198/20260225_122301.png",subImages:["data/数学β/大問198/小問/20260225_122323.png","data/数学β/大問198/小問/20260225_122328.png"]},{id:"199",type:"大問",difficulty:4,mainImage:"data/数学β/大問199/20260225_122332.png",subImages:[]}]},"方べきの定理":{name:"方べきの定理",questions:[{id:"200",type:"大問",difficulty:1,mainImage:"data/数学β/大問200/20260225_122337.png",subImages:["data/数学β/大問200/小問/20260225_122342.png","data/数学β/大問200/小問/20260225_122345.png","data/数学β/大問200/小問/20260225_122348.png"]},{id:"201",type:"大問",difficulty:1,mainImage:"data/数学β/大問201/20260225_122351.png",subImages:["data/数学β/大問201/小問/20260225_122354.png","data/数学β/大問201/小問/20260225_122358.png","data/数学β/大問201/小問/20260225_122401.png"]},{id:"202",type:"大問",difficulty:1,mainImage:"data/数学β/大問202/20260225_122408.png",subImages:[]},{id:"203",type:"大問",difficulty:1,mainImage:"data/数学β/大問203/20260225_122412.png",subImages:["data/数学β/大問203/小問/20260225_122416.png","data/数学β/大問203/小問/20260225_122419.png","data/数学β/大問203/小問/20260225_122422.png"]},{id:"204",type:"大問",difficulty:2,mainImage:"data/数学β/大問204/20260225_122425.png",subImages:[]},{id:"205",type:"大問",difficulty:2,mainImage:"data/数学β/大問205/20260225_122433.png",subImages:[]},{id:"206",type:"大問",difficulty:4,mainImage:"data/数学β/大問206/20260225_122436.png",subImages:[]}]},"2つの円の位置関係":{name:"2つの円の位置関係",questions:[{id:"207",type:"大問",difficulty:1,mainImage:"data/数学β/大問207/20260225_122440.png",subImages:["data/数学β/大問207/小問/20260225_122448.png","data/数学β/大問207/小問/20260225_122451.png","data/数学β/大問207/小問/20260225_122454.png","data/数学β/大問207/小問/20260225_122457.png","data/数学β/大問207/小問/20260225_122500.png"]},{id:"208",type:"大問",difficulty:1,mainImage:"data/数学β/大問208/20260225_122504.png",subImages:[]},{id:"209",type:"大問",difficulty:1,mainImage:"data/数学β/大問209/20260225_122509.png",subImages:["data/数学β/大問209/小問/20260225_122514.png","data/数学β/大問209/小問/20260225_122518.png"]},{id:"210",type:"大問",difficulty:2,mainImage:"data/数学β/大問210/20260225_122524.png",subImages:["data/数学β/大問210/小問/20260225_122530.png","data/数学β/大問210/小問/20260225_122533.png"]},{id:"211",type:"大問",difficulty:2,mainImage:"data/数学β/大問211/20260225_122537.png",subImages:[]}]},"作図":{name:"作図",questions:[{id:"212",type:"大問",difficulty:1,mainImage:"data/数学β/大問212/20260225_122542.png",subImages:[]},{id:"213",type:"大問",difficulty:1,mainImage:"data/数学β/大問213/20260225_122547.png",subImages:[]},{id:"214",type:"大問",difficulty:1,mainImage:"data/数学β/大問214/20260225_122553.png",subImages:["data/数学β/大問214/小問/20260225_122558.png","data/数学β/大問214/小問/20260225_122601.png"]},{id:"215",type:"大問",difficulty:1,mainImage:"data/数学β/大問215/20260225_122604.png",subImages:[]},{id:"216",type:"大問",difficulty:1,mainImage:"data/数学β/大問216/20260225_122609.png",subImages:["data/数学β/大問216/小問/20260225_122613.png","data/数学β/大問216/小問/20260225_122618.png"]},{id:"217",type:"大問",difficulty:1,mainImage:"data/数学β/大問217/20260225_122621.png",subImages:["data/数学β/大問217/小問/20260225_122626.png","data/数学β/大問217/小問/20260225_122630.png"]},{id:"218",type:"大問",difficulty:2,mainImage:"data/数学β/大問218/20260225_122633.png",subImages:[]},{id:"219",type:"大問",difficulty:2,mainImage:"data/数学β/大問219/20260225_122640.png",subImages:[]},{id:"220",type:"大問",difficulty:2,mainImage:"data/数学β/大問220/20260225_122645.png",subImages:[]},{id:"221",type:"大問",difficulty:4,mainImage:"data/数学β/大問221/20260225_122649.png",subImages:[]}]},"空間図形":{name:"空間図形",questions:[{id:"222",type:"大問",difficulty:1,mainImage:"data/数学β/大問222/20260225_122658.png",subImages:["data/数学β/大問222/小問/20260225_122703.png"]},{id:"223",type:"大問",difficulty:1,mainImage:"data/数学β/大問223/20260225_122706.png",subImages:["data/数学β/大問223/小問/20260225_122710.png","data/数学β/大問223/小問/20260225_122712.png"]},{id:"224",type:"大問",difficulty:1,mainImage:"data/数学β/大問224/20260225_122715.png",subImages:["data/数学β/大問224/小問/20260225_122718.png"]},{id:"225",type:"大問",difficulty:1,mainImage:"data/数学β/大問225/20260225_122721.png",subImages:["data/数学β/大問225/小問/20260225_122725.png","data/数学β/大問225/小問/20260225_122728.png"]},{id:"226",type:"大問",difficulty:2,mainImage:"data/数学β/大問226/20260225_122733.png",subImages:["data/数学β/大問226/小問/20260225_122738.png","data/数学β/大問226/小問/20260225_122741.png","data/数学β/大問226/小問/20260225_122744.png","data/数学β/大問226/小問/20260225_122748.png"]},{id:"227",type:"大問",difficulty:2,mainImage:"data/数学β/大問227/20260225_122752.png",subImages:[]},{id:"228",type:"大問",difficulty:2,mainImage:"data/数学β/大問228/20260225_122759.png",subImages:[]},{id:"229",type:"大問",difficulty:2,mainImage:"data/数学β/大問229/20260225_122804.png",subImages:[]},{id:"230",type:"大問",difficulty:2,mainImage:"data/数学β/大問230/20260225_122810.png",subImages:["data/数学β/大問230/小問/20260225_122814.png","data/数学β/大問230/小問/20260225_122817.png"]}]},"多面体":{name:"多面体",questions:[{id:"231",type:"大問",difficulty:1,mainImage:"data/数学β/大問231/20260225_122824.png",subImages:["data/数学β/大問231/小問/20260225_122828.png","data/数学β/大問231/小問/20260225_122832.png","data/数学β/大問231/小問/20260225_122834.png","data/数学β/大問231/小問/20260225_122837.png"]},{id:"232",type:"大問",difficulty:1,mainImage:"data/数学β/大問232/20260225_122842.png",subImages:["data/数学β/大問232/小問/20260225_122846.png","data/数学β/大問232/小問/20260225_122849.png"]},{id:"233",type:"大問",difficulty:2,mainImage:"data/数学β/大問233/20260225_122852.png",subImages:["data/数学β/大問233/小問/20260225_122857.png"]},{id:"234",type:"大問",difficulty:2,mainImage:"data/数学β/大問234/20260225_122903.png",subImages:["data/数学β/大問234/小問/20260225_122908.png"]}]},"演習問題":{name:"演習問題",questions:[{id:"演11",type:"演習問題",difficulty:3,mainImage:"data/数学β/演習問題11/20260225_123817.png",subImages:[]},{id:"演12",type:"演習問題",difficulty:3,mainImage:"data/数学β/演習問題12/20260225_123827.png",subImages:["data/数学β/演習問題12/小問/20260225_123832.png","data/数学β/演習問題12/小問/20260225_123835.png"]},{id:"演13",type:"演習問題",difficulty:3,mainImage:"data/数学β/演習問題13/20260225_123840.png",subImages:[]},{id:"演14",type:"演習問題",difficulty:3,mainImage:"data/数学β/演習問題14/20260225_123844.png",subImages:[]},{id:"演15",type:"演習問題",difficulty:3,mainImage:"data/数学β/演習問題15/20260225_123849.png",subImages:["data/数学β/演習問題15/小問/20260225_123853.png"]},{id:"演16",type:"演習問題",difficulty:3,mainImage:"data/数学β/演習問題16/20260225_123859.png",subImages:["data/数学β/演習問題16/小問/20260225_123906.png","data/数学β/演習問題16/小問/20260225_123909.png"]},{id:"演17",type:"演習問題",difficulty:3,mainImage:"data/数学β/演習問題17/20260225_123913.png",subImages:[]},{id:"演18",type:"演習問題",difficulty:3,mainImage:"data/数学β/演習問題18/20260225_123918.png",subImages:["data/数学β/演習問題18/小問/20260225_123922.png"]},{id:"演19",type:"演習問題",difficulty:3,mainImage:"data/数学β/演習問題19/20260225_123928.png",subImages:["data/数学β/演習問題19/小問/20260225_123932.png","data/数学β/演習問題19/小問/20260225_123936.png"]},{id:"演20",type:"演習問題",difficulty:3,mainImage:"data/数学β/演習問題20/20260225_123941.png",subImages:[]}]},"総合問題":{name:"総合問題",questions:[{id:"総2",type:"総合問題",difficulty:4,mainImage:"data/数学β/総合問題2/20260225_123953.png",subImages:["data/数学β/総合問題2/小問/20260225_124001.png"]}]},"例題":{name:"例題",questions:[{id:"例26",type:"例題",difficulty:2,mainImage:"data/数学β/例題26/20260225_123709.png",subImages:[]},{id:"例27",type:"例題",difficulty:2,mainImage:"data/数学β/例題27/20260225_123716.png",subImages:[]},{id:"例28",type:"例題",difficulty:2,mainImage:"data/数学β/例題28/20260225_123735.png",subImages:[]},{id:"例29",type:"例題",difficulty:2,mainImage:"data/数学β/例題29/20260225_123746.png",subImages:[]},{id:"例30",type:"例題",difficulty:2,mainImage:"data/数学β/例題30/20260225_123801.png",subImages:["data/数学β/例題30/小問/20260225_123805.png"]}]}}}},difficultyLabels:{1:"STEP A",2:"STEP B",3:"演習",4:"発展"}};
+
+const DIFF_COLORS = ['','#059669','#2563eb','#d97706','#dc2626'];
+
+// ─── FLAT LIST ───
+const ALL_QUESTIONS = [];
+for (const [subjKey, subj] of Object.entries(DB.subjects)) {
+  for (const [topicKey, topic] of Object.entries(subj.topics)) {
+    for (const q of topic.questions) {
+      ALL_QUESTIONS.push({ ...q, subject: subjKey, topic: topicKey });
+    }
+  }
+}
+
+// ─── ANSWER IMAGE MAP ───
+const ANSWER_FILES = {
+"数α解答/大問325":"20260225_161334.png","数α解答/大問326":"20260225_161338.png","数α解答/大問327":"20260225_161343.png","数α解答/大問328":"20260225_161347.png","数α解答/大問329":"20260225_161350.png","数α解答/大問330":"20260225_161355.png","数α解答/大問331":"20260225_161359.png","数α解答/大問332":"20260225_161402.png","数α解答/大問333":"20260225_161406.png","数α解答/大問334":"20260225_161410.png","数α解答/大問335":"20260225_161413.png","数α解答/大問336":"20260225_161418.png","数α解答/大問337":"20260225_161423.png","数α解答/大問338":"20260225_161426.png","数α解答/大問339":"20260225_161431.png","数α解答/大問340":"20260225_161436.png","数α解答/大問341":"20260225_161441.png","数α解答/大問342":"20260225_161504.png","数α解答/大問343":"20260225_161509.png","数α解答/大問344":"20260225_161514.png","数α解答/大問345":"20260225_161519.png","数α解答/大問346":"20260225_161524.png","数α解答/大問347":"20260225_161529.png","数α解答/大問348":"20260225_161533.png","数α解答/大問349":"20260225_161539.png","数α解答/大問350":"20260225_161545.png","数α解答/大問351":"20260225_161550.png","数α解答/大問352":"20260225_161555.png","数α解答/大問353":"20260225_161600.png","数α解答/大問354":"20260225_161604.png","数α解答/大問355":"20260225_161608.png","数α解答/大問356":"20260225_161612.png","数α解答/大問357":"20260225_161620.png","数α解答/大問358":"20260225_161626.png","数α解答/大問359":"20260225_161631.png","数α解答/大問360":"20260225_161642.png","数α解答/大問361":"20260225_161646.png","数α解答/大問362":"20260225_161650.png","数α解答/大問363":"20260225_161653.png","数α解答/大問364":"20260225_161657.png","数α解答/大問365":"20260225_161703.png","数α解答/大問366":"20260225_161708.png","数α解答/大問367":"20260225_161712.png","数α解答/大問368":"20260225_161715.png","数α解答/大問369":"20260225_161719.png","数α解答/大問370":"20260225_161723.png","数α解答/大問371":"20260225_161727.png","数α解答/大問372":"20260225_161732.png","数α解答/大問373":"20260225_161735.png","数α解答/大問374":"20260225_161739.png","数α解答/大問375":"20260225_161744.png","数α解答/大問376":"20260225_161748.png","数α解答/大問377":"20260225_161751.png","数α解答/大問378":"20260225_161805.png","数α解答/大問379":"20260225_161812.png","数α解答/大問380":"20260225_161817.png","数α解答/大問381":"20260225_161821.png","数α解答/大問382":"20260225_161825.png","数α解答/大問383":"20260225_161828.png","数α解答/大問384":"20260225_161831.png","数α解答/大問385":"20260225_161834.png","数α解答/大問386":"20260225_161837.png","数α解答/大問387":"20260225_161841.png","数α解答/大問388":"20260225_161845.png","数α解答/大問389":"20260225_161848.png","数α解答/大問390":"20260225_161851.png","数α解答/大問391":"20260225_161854.png","数α解答/大問392":"20260225_161858.png","数α解答/大問393":"20260225_161901.png","数α解答/大問394":"20260225_161905.png","数α解答/大問395":"20260225_161909.png","数α解答/演習問題39":"20260225_161914.png","数α解答/演習問題40":"20260225_161919.png","数α解答/演習問題41":"20260225_161922.png","数α解答/演習問題42":"20260225_161926.png","数α解答/演習問題43":"20260225_161930.png","数α解答/総合問題5":"20260225_161943.png","数α解答/例題33":"20260225_162007.png","数α解答/例題34":"20260225_162014.png","数α解答/例題35":"20260225_162018.png","数α解答/例題36":"20260225_162022.png","数α解答/例題37":"20260225_162029.png","数α解答/例題38":"20260225_162035.png",
+"数β解答/大問150":"20260225_155231.png","数β解答/大問151":"20260225_155206.png","数β解答/大問152":"20260225_155241.png","数β解答/大問153":"20260225_155246.png","数β解答/大問154":"20260225_155252.png","数β解答/大問155":"20260225_155258.png","数β解答/大問156":"20260225_155303.png","数β解答/大問157":"20260225_155306.png","数β解答/大問158":"20260225_155310.png","数β解答/大問159":"20260225_155321.png","数β解答/大問160":"20260225_155326.png","数β解答/大問161":"20260225_155330.png","数β解答/大問162":"20260225_155338.png","数β解答/大問163":"20260225_155342.png","数β解答/大問164":"20260225_155346.png","数β解答/大問165":"20260225_155346.png","数β解答/大問166":"20260225_155352.png","数β解答/大問167":"20260225_155355.png","数β解答/大問168":"20260225_155358.png","数β解答/大問169":"20260225_155401.png","数β解答/大問170":"20260225_155409.png","数β解答/大問171":"20260225_155412.png","数β解答/大問172":"20260225_155415.png","数β解答/大問173":"20260225_155419.png","数β解答/大問174":"20260225_155424.png","数β解答/大問175":"20260225_155427.png","数β解答/大問176":"20260225_155432.png","数β解答/大問177":"20260225_155436.png","数β解答/大問178":"20260225_155441.png","数β解答/大問179":"20260225_155444.png","数β解答/大問180":"20260225_155449.png","数β解答/大問181":"20260225_155454.png","数β解答/大問182":"20260225_155458.png","数β解答/大問183":"20260225_155502.png","数β解答/大問184":"20260225_155506.png","数β解答/大問185":"20260225_155510.png","数β解答/大問186":"20260225_155514.png","数β解答/大問187":"20260225_155521.png","数β解答/大問188":"20260225_155524.png","数β解答/大問189":"20260225_155528.png","数β解答/大問190":"20260225_155531.png","数β解答/大問191":"20260225_155535.png","数β解答/大問192":"20260225_155538.png","数β解答/大問193":"20260225_155543.png","数β解答/大問194":"20260225_155548.png","数β解答/大問195":"20260225_155551.png","数β解答/大問196":"20260225_155554.png","数β解答/大問197":"20260225_155557.png","数β解答/大問198":"20260225_155602.png","数β解答/大問199":"20260225_155608.png","数β解答/大問200":"20260225_155611.png","数β解答/大問201":"20260225_155615.png","数β解答/大問202":"20260225_155622.png","数β解答/大問203":"20260225_155624.png","数β解答/大問204":"20260225_155628.png","数β解答/大問205":"20260225_155636.png","数β解答/大問206":"20260225_155640.png","数β解答/大問207":"20260225_155644.png","数β解答/大問208":"20260225_155648.png","数β解答/大問209":"20260225_155651.png","数β解答/大問210":"20260225_155657.png","数β解答/大問211":"20260225_155701.png","数β解答/大問212":"20260225_155705.png","数β解答/大問213":"20260225_155710.png","数β解答/大問214":"20260225_155714.png","数β解答/大問215":"20260225_155720.png","数β解答/大問216":"20260225_155723.png","数β解答/大問217":"20260225_155727.png","数β解答/大問218":"20260225_155731.png","数β解答/大問219":"20260225_155735.png","数β解答/大問220":"20260225_155739.png","数β解答/大問221":"20260225_155743.png","数β解答/大問222":"20260225_155748.png","数β解答/大問223":"20260225_155751.png","数β解答/大問224":"20260225_155755.png","数β解答/大問225":"20260225_155759.png","数β解答/大問226":"20260225_155804.png","数β解答/大問227":"20260225_155807.png","数β解答/大問228":"20260225_155810.png","数β解答/大問229":"20260225_155815.png","数β解答/大問230":"20260225_155819.png","数β解答/大問231":"20260225_155824.png","数β解答/大問232":"20260225_155829.png","数β解答/大問233":"20260225_155833.png","数β解答/大問234":"20260225_155836.png","数β解答/演習問題11":"20260225_155842.png","数β解答/演習問題12":"20260225_155849.png","数β解答/演習問題13":"20260225_155853.png","数β解答/演習問題14":"20260225_155858.png","数β解答/演習問題15":"20260225_155901.png","数β解答/演習問題16":"20260225_155907.png","数β解答/演習問題17":"20260225_155911.png","数β解答/演習問題18":"20260225_155915.png","数β解答/演習問題19":"20260225_155919.png","数β解答/演習問題20":"20260225_155924.png","数β解答/総合問題2":"20260225_155928.png","数β解答/例題26":"20260225_155935.png","数β解答/例題27":"20260225_155938.png","数β解答/例題28":"20260225_155942.png","数β解答/例題29":"20260225_155946.png","数β解答/例題30":"20260225_155951.png"
+};
+const ANSWER_DIR_MAP = { "数学α": "数α解答", "数学β": "数β解答" };
+ALL_QUESTIONS.forEach(q => {
+  const dir = ANSWER_DIR_MAP[q.subject];
+  const num = q.id.match(/\d+/)[0];
+  const key = `${dir}/${q.type}${num}`;
+  const file = ANSWER_FILES[key];
+  if (file) q.answerImage = `data/${key}/${file}`;
+});
+
+// ─── HELPERS ───
+function shuffle(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+function sortQuestions(qs) {
+  const so = { "数学α": 0, "数学β": 1 };
+  return qs.sort((a, b) =>
+    (so[a.subject]||0) - (so[b.subject]||0) ||
+    a.difficulty - b.difficulty ||
+    a.id.localeCompare(b.id, 'ja', { numeric: true })
+  );
+}
+
+function avgDifficulty(qs) {
+  return qs.length ? qs.reduce((s, q) => s + q.difficulty, 0) / qs.length : 0;
+}
+
+function getMode() {
+  return document.querySelector('input[name="mode"]:checked').value;
+}
+
+function getSelectedSubjects(panelId) {
+  return [...document.querySelectorAll(`#${panelId} input[type="checkbox"]:checked`)].map(cb => cb.value);
+}
+
+function getSelectedQuestionIndices(containerId) {
+  return new Set(
+    [...document.querySelectorAll(`#${containerId} .question-cb:checked`)]
+      .map(cb => parseInt(cb.dataset.idx))
+  );
+}
+
+function getSubMode() {
+  const mode = getMode();
+  const name = mode === 'manual' ? 'sub-mode' : 'auto-sub-mode';
+  const val = document.querySelector(`input[name="${name}"]:checked`).value;
+  const nId = mode === 'manual' ? 'sub-n' : 'auto-sub-n';
+  const n = parseInt(document.getElementById(nId).value) || 2;
+  return { mode: val, n };
+}
+
+function getAnswerSpaceClass() {
+  if (!document.getElementById('answer-space-toggle').checked) return '';
+  return 'answer-space-' + document.querySelector('input[name="answer-size"]:checked').value;
+}
+
+// ─── RATIO STATE ───
+const ratios = { 1: 20, 2: 40, 3: 30, 4: 10 };
+
+function getRatios() {
+  return { ...ratios };
+}
+
+function updateRatioBar() {
+  const bar = document.getElementById('ratio-bar');
+  const total = Object.values(ratios).reduce((a, b) => a + b, 0) || 1;
+  bar.innerHTML = [1,2,3,4].map(l => {
+    const pct = ratios[l] / total * 100;
+    return `<div class="ratio-bar-seg" style="flex:${pct};background:${DIFF_COLORS[l]}${pct < 1 ? ';min-width:0' : ''}"></div>`;
+  }).join('');
+}
+
+// ─── FILTERING ───
+function getFilteredPool() {
+  const mode = getMode();
+  const containerId = mode === 'manual' ? 'topic-selectors-manual' : 'topic-selectors-auto';
+  const subjectCheckId = mode === 'manual' ? 'subject-checks-manual' : 'subject-checks-auto';
+  const subjects = getSelectedSubjects(subjectCheckId);
+  const indices = getSelectedQuestionIndices(containerId);
+  return ALL_QUESTIONS.filter((q, i) =>
+    subjects.includes(q.subject) && indices.has(i)
+  );
+}
+
+function updatePoolStats() {
+  const pool = getFilteredPool();
+  document.getElementById('pool-count').textContent = pool.length;
+  document.getElementById('pool-avg').textContent = pool.length ? avgDifficulty(pool).toFixed(1) : '-';
+  const mode = getMode();
+  const slider = document.getElementById(mode === 'manual' ? 'count-slider' : 'auto-count-slider');
+  const valEl = document.getElementById(mode === 'manual' ? 'count-val' : 'auto-count-val');
+  slider.max = Math.max(pool.length, 1);
+  if (parseInt(slider.value) > pool.length) slider.value = pool.length;
+  valEl.textContent = slider.value;
+}
+
+// ─── MANUAL SELECTION ───
+function selectQuestionsManual() {
+  const pool = getFilteredPool();
+  const requested = parseInt(document.getElementById('count-slider').value);
+  const n = Math.min(requested, pool.length);
+  if (n === 0) return { questions: [], warnings: ['条件に合う問題がありません。'] };
+  const warnings = [];
+  if (n < requested) warnings.push(`プール数（${pool.length}問）に制限されました。`);
+  return { questions: sortQuestions(shuffle(pool).slice(0, n)), warnings };
+}
+
+// ─── AUTO SELECTION (RATIO-BASED) ───
+function selectQuestionsAuto() {
+  const pool = getFilteredPool();
+  const requested = parseInt(document.getElementById('auto-count-slider').value);
+  const N = Math.min(requested, pool.length);
+  const warnings = [];
+  if (N === 0 || pool.length === 0) return { questions: [], warnings: ['条件に合う問題がありません。'] };
+
+  const groups = { 1: [], 2: [], 3: [], 4: [] };
+  pool.forEach(q => groups[q.difficulty].push(q));
+
+  const r = getRatios();
+  for (const l of [1,2,3,4]) {
+    if (r[l] > 0 && groups[l].length === 0) {
+      warnings.push(`${DB.difficultyLabels[l]}が選択プールに含まれていないため、他の難易度に振り分けます。`);
+      r[l] = 0;
+    }
+  }
+  const total = Object.values(r).reduce((a, b) => a + b, 0) || 1;
+
+  // Compute ideal counts per level
+  const ideal = {};
+  let assigned = 0;
+  const levels = [1,2,3,4].filter(l => r[l] > 0);
+  levels.forEach((l, i) => {
+    if (i < levels.length - 1) {
+      ideal[l] = Math.round(N * r[l] / total);
+      assigned += ideal[l];
+    } else {
+      ideal[l] = N - assigned;
+    }
+  });
+  [1,2,3,4].forEach(l => { if (!(l in ideal)) ideal[l] = 0; });
+
+  // Clamp to stock, collect surplus
+  let surplus = 0;
+  for (const l of [1,2,3,4]) {
+    if (ideal[l] > groups[l].length) {
+      surplus += ideal[l] - groups[l].length;
+      ideal[l] = groups[l].length;
+    }
+  }
+
+  // Redistribute surplus to levels with remaining capacity, weighted by ratio
+  if (surplus > 0) {
+    for (let pass = 0; pass < 4 && surplus > 0; pass++) {
+      const candidates = [1,2,3,4].filter(l => groups[l].length - ideal[l] > 0);
+      const cTotal = candidates.reduce((s, l) => s + r[l], 0) || 1;
+      for (const l of candidates) {
+        if (surplus <= 0) break;
+        const add = Math.min(Math.max(1, Math.round(surplus * r[l] / cTotal)), groups[l].length - ideal[l], surplus);
+        ideal[l] += add;
+        surplus -= add;
+      }
+    }
+  }
+
+  let selected = [];
+  for (const l of [1,2,3,4]) {
+    if (ideal[l] > 0) selected = selected.concat(shuffle(groups[l]).slice(0, ideal[l]));
+  }
+
+  if (N < requested) warnings.push(`プール数（${pool.length}問）に制限されました。`);
+  const actual = avgDifficulty(selected);
+  const diffBreakdown = [1,2,3,4].map(l => {
+    const cnt = selected.filter(q => q.difficulty === l).length;
+    return cnt > 0 ? `${DB.difficultyLabels[l]}:${cnt}問` : null;
+  }).filter(Boolean).join('、');
+  if (diffBreakdown) warnings.push(`内訳: ${diffBreakdown}`);
+
+  return { questions: sortQuestions(selected), warnings };
+}
+
+// ─── SUB-IMAGE SELECTION ───
+function getSubImagesToShow(subImages) {
+  const { mode, n } = getSubMode();
+  if (mode === 'none' || subImages.length === 0) return [];
+  if (mode === 'all') return subImages;
+  if (n >= subImages.length) return subImages;
+  const indices = subImages.map((_, i) => i);
+  return shuffle(indices).slice(0, n).sort((a, b) => a - b).map(i => subImages[i]);
+}
+
+// ─── RENDERING ───
+function renderExam(result) {
+  const area = document.getElementById('exam-area');
+  const { questions, warnings } = result;
+  if (questions.length === 0) {
+    area.innerHTML = '<div class="main-inner"><div class="exam-placeholder"><div class="exam-placeholder-icon">&#9998;</div><div class="exam-placeholder-text">条件に合う問題がありません</div></div></div>';
+    return;
+  }
+  const ansClass = getAnswerSpaceClass();
+  let html = '<div class="main-inner">';
+  html += '<div class="exam-header">';
+  html += `<div class="exam-title">模擬試験</div>`;
+  html += `<div class="exam-meta">${questions.length}問 ／ 平均難易度 ${avgDifficulty(questions).toFixed(1)} ／ ${new Date().toLocaleDateString('ja-JP')}</div>`;
+  html += '</div>';
+  for (const w of warnings) html += `<div class="warning">${w}</div>`;
+  questions.forEach((q, i) => { html += renderQuestionCard(q, i + 1, ansClass); });
+  // Answer key for print
+  html += '<div class="answer-key">';
+  html += '<div class="answer-key-header"><div class="exam-title">解答</div></div>';
+  questions.forEach((q, i) => {
+    if (!q.answerImage) return;
+    const displayId = q.type === '大問' ? `${q.type}${q.id}` : q.id;
+    html += '<div class="answer-key-item">';
+    html += `<div class="answer-key-label">第${i + 1}問　${displayId}</div>`;
+    html += `<div class="question-images"><img src="${q.answerImage}" alt="解答"></div>`;
+    html += '</div>';
+  });
+  html += '</div>';
+  html += '</div>';
+  area.innerHTML = html;
+  uniformScaleImages();
+}
+
+function uniformScaleImages(targetWidth) {
+  const inner = document.querySelector('.main-inner');
+  if (!inner) return;
+  const imgs = [...inner.querySelectorAll('.question-images img')];
+  if (!imgs.length) return;
+  // Reset all widths
+  imgs.forEach(img => { img.style.width = ''; });
+  const containerW = targetWidth || inner.clientWidth;
+  // Wait for ALL images to fully load (complete AND naturalWidth > 0)
+  const loaded = imgs.map(img =>
+    (img.complete && img.naturalWidth > 0)
+      ? Promise.resolve()
+      : new Promise(r => { img.onload = r; img.onerror = r; })
+  );
+  Promise.all(loaded).then(() => {
+    let maxW = 0;
+    imgs.forEach(img => { if (img.naturalWidth > maxW) maxW = img.naturalWidth; });
+    if (maxW === 0 || maxW <= containerW) return;
+    const scale = containerW / maxW;
+    imgs.forEach(img => {
+      if (img.naturalWidth > 0) {
+        img.style.width = Math.round(img.naturalWidth * scale) + 'px';
+        img.style.height = 'auto';
+      }
+    });
+  });
+}
+
+/* Sync version for beforeprint (images already loaded) */
+function uniformScaleImagesSync(targetWidth) {
+  const imgs = [...document.querySelectorAll('.question-images img')];
+  if (!imgs.length) return;
+  let maxW = 0;
+  imgs.forEach(img => { if (img.naturalWidth > maxW) maxW = img.naturalWidth; });
+  if (maxW === 0) return;
+  const scale = Math.min(1, targetWidth / maxW);
+  imgs.forEach(img => {
+    if (img.naturalWidth > 0) {
+      img.style.width = Math.round(img.naturalWidth * scale) + 'px';
+      img.style.height = 'auto';
+    }
+  });
+}
+
+/* Print scaling: re-compute uniform scale for A4 page width */
+window.addEventListener('beforeprint', () => {
+  // A4 = 210mm, @page margins = 12mm left + 12mm right = 24mm
+  // Printable width = 186mm ≈ 703px at 96dpi
+  // Use conservative value to ensure no overflow
+  uniformScaleImagesSync(680);
+});
+window.addEventListener('afterprint', () => {
+  uniformScaleImages(); // Restore screen scaling
+});
+
+function renderQuestionCard(q, num, ansClass) {
+  const displayId = q.type === '大問' ? `${q.type}${q.id}` : q.id;
+  const subs = getSubImagesToShow(q.subImages);
+  let h = `<div class="question-card" data-diff="${q.difficulty}">`;
+  h += '<div class="question-card-header">';
+  h += `<span class="q-number">第${num}問</span>`;
+  h += `<span class="q-id">${displayId}</span>`;
+  h += `<span class="diff-badge diff-${q.difficulty}">${DB.difficultyLabels[q.difficulty]}</span>`;
+  h += `<span class="q-meta-tag q-subject-tag">${q.subject}</span>`;
+  h += `<span class="q-meta-tag q-topic-tag">${q.topic}</span>`;
+  if (q.answerImage) h += `<span class="q-answer-toggle">解答 ▸</span>`;
+  h += '</div>';
+  h += '<div class="question-images">';
+  h += `<img src="${q.mainImage}" alt="${displayId}" onerror="this.outerHTML='<div class=\\'img-error\\'>画像読み込みエラー</div>'">`;
+  for (const src of subs) {
+    h += `<img src="${src}" alt="小問" onerror="this.outerHTML='<div class=\\'img-error\\'>読み込みエラー</div>'">`;
+  }
+  h += '</div>';
+  if (ansClass) h += `<div class="answer-space ${ansClass}"></div>`;
+  if (q.answerImage) {
+    h += '<div class="answer-section"><div class="answer-label">解答</div>';
+    h += `<div class="question-images"><img src="${q.answerImage}" alt="解答" onerror="this.outerHTML='<div class=\\'img-error\\'>解答画像読み込みエラー</div>'"></div>`;
+    h += '</div>';
+  }
+  h += '</div>';
+  return h;
+}
+
+// ─── UI INIT ───
+function initUI() {
+  // Subjects
+  for (const [key, subj] of Object.entries(DB.subjects)) {
+    const lbl = `${subj.name}（${subj.subtitle}）`;
+    for (const pid of ['subject-checks-manual', 'subject-checks-auto']) {
+      document.getElementById(pid).innerHTML += `<label><input type="checkbox" value="${key}" checked> ${lbl}</label>`;
+    }
+  }
+  // Hierarchical topic selectors
+  buildHierarchicalSelector('topic-selectors-manual');
+  buildHierarchicalSelector('topic-selectors-auto');
+  // Ratio sliders
+  buildRatioControls();
+
+  // Mode toggle
+  document.querySelectorAll('input[name="mode"]').forEach(r => {
+    r.addEventListener('change', () => {
+      const m = getMode();
+      document.getElementById('panel-manual').classList.toggle('hidden', m !== 'manual');
+      document.getElementById('panel-auto').classList.toggle('hidden', m !== 'auto');
+      updatePoolStats();
+    });
+  });
+  // Sliders
+  document.getElementById('count-slider').addEventListener('input', e => { document.getElementById('count-val').textContent = e.target.value; });
+  document.getElementById('auto-count-slider').addEventListener('input', e => { document.getElementById('auto-count-val').textContent = e.target.value; });
+  // Filter changes
+  document.querySelector('.sidebar').addEventListener('change', () => setTimeout(updatePoolStats, 0));
+  // Buttons
+  document.getElementById('btn-generate').addEventListener('click', () => {
+    const result = getMode() === 'manual' ? selectQuestionsManual() : selectQuestionsAuto();
+    renderExam(result);
+  });
+  document.getElementById('btn-print').addEventListener('click', () => window.print());
+  // Answer toggle (event delegation)
+  document.getElementById('exam-area').addEventListener('click', (e) => {
+    const header = e.target.closest('.question-card-header');
+    if (!header) return;
+    const card = header.closest('.question-card');
+    const ans = card.querySelector('.answer-section');
+    if (!ans) return;
+    ans.classList.toggle('open');
+    const toggle = header.querySelector('.q-answer-toggle');
+    if (toggle) toggle.textContent = ans.classList.contains('open') ? '解答 ▾' : '解答 ▸';
+  });
+
+  updatePoolStats();
+}
+
+function buildHierarchicalSelector(containerId) {
+  const container = document.getElementById(containerId);
+  container.innerHTML = '';
+  let qIdx = 0;
+  for (const [subjKey, subj] of Object.entries(DB.subjects)) {
+    const section = document.createElement('div');
+    section.className = 'topic-section';
+    const header = document.createElement('div');
+    header.className = 'topic-header open';
+    header.innerHTML = `<span>${subj.name}<span class="topic-count">${subj.subtitle}</span></span><span class="arrow">&#9654;</span>`;
+    const list = document.createElement('div');
+    list.className = 'topic-list open';
+    header.addEventListener('click', () => { header.classList.toggle('open'); list.classList.toggle('open'); });
+    const actions = document.createElement('div');
+    actions.className = 'topic-actions';
+    const bAll = document.createElement('button'); bAll.textContent = '全選択';
+    bAll.onclick = () => {
+      list.querySelectorAll('input[type="checkbox"]').forEach(c => { c.checked = true; c.indeterminate = false; });
+      updatePoolStats();
+    };
+    const bNone = document.createElement('button'); bNone.textContent = '全解除';
+    bNone.onclick = () => {
+      list.querySelectorAll('input[type="checkbox"]').forEach(c => { c.checked = false; c.indeterminate = false; });
+      updatePoolStats();
+    };
+    actions.append(bAll, bNone);
+    list.appendChild(actions);
+    for (const [topicKey, topic] of Object.entries(subj.topics)) {
+      const group = document.createElement('div');
+      group.className = 'topic-group';
+      const parentRow = document.createElement('div');
+      parentRow.className = 'topic-parent';
+      const parentCb = document.createElement('input');
+      parentCb.type = 'checkbox'; parentCb.checked = true; parentCb.className = 'topic-parent-cb';
+      const toggle = document.createElement('span');
+      toggle.className = 'topic-toggle'; toggle.textContent = '\u25B6';
+      const nameSpan = document.createElement('span');
+      nameSpan.textContent = topic.name;
+      const countSpan = document.createElement('span');
+      countSpan.className = 'topic-count'; countSpan.textContent = `(${topic.questions.length})`;
+      parentRow.append(parentCb, toggle, nameSpan, countSpan);
+      const children = document.createElement('div');
+      children.className = 'topic-children';
+      parentRow.addEventListener('click', (e) => {
+        if (e.target === parentCb) return;
+        toggle.classList.toggle('open'); children.classList.toggle('open');
+      });
+      parentCb.addEventListener('change', () => {
+        children.querySelectorAll('.question-cb').forEach(cb => cb.checked = parentCb.checked);
+        parentCb.indeterminate = false;
+        updatePoolStats();
+      });
+      for (const q of topic.questions) {
+        const label = document.createElement('label');
+        const cb = document.createElement('input');
+        cb.type = 'checkbox'; cb.checked = true; cb.className = 'question-cb'; cb.dataset.idx = qIdx;
+        cb.addEventListener('change', () => { syncParentState(parentCb, children); updatePoolStats(); });
+        const displayId = q.type === '大問' ? `大問${q.id}` : q.id;
+        const idSpan = document.createElement('span');
+        idSpan.className = 'question-id'; idSpan.textContent = displayId;
+        const badge = document.createElement('span');
+        badge.className = `diff-badge diff-${q.difficulty}`; badge.textContent = DB.difficultyLabels[q.difficulty];
+        label.append(cb, idSpan, badge);
+        children.appendChild(label);
+        qIdx++;
+      }
+      group.append(parentRow, children);
+      list.appendChild(group);
+    }
+    section.append(header, list);
+    container.appendChild(section);
+  }
+}
+
+function syncParentState(parentCb, childrenContainer) {
+  const cbs = childrenContainer.querySelectorAll('.question-cb');
+  const checked = [...cbs].filter(c => c.checked).length;
+  parentCb.checked = checked > 0;
+  parentCb.indeterminate = checked > 0 && checked < cbs.length;
+}
+
+function buildRatioControls() {
+  const grid = document.getElementById('ratio-grid');
+  grid.innerHTML = '';
+  for (const lv of [1,2,3,4]) {
+    const labelSpan = document.createElement('span');
+    labelSpan.className = 'ratio-label';
+    labelSpan.innerHTML = `<span class="diff-badge diff-${lv}">${DB.difficultyLabels[lv]}</span>`;
+    const slider = document.createElement('input');
+    slider.type = 'range'; slider.min = 0; slider.max = 100; slider.value = ratios[lv];
+    slider.dataset.level = lv;
+    const val = document.createElement('span');
+    val.className = 'ratio-val';
+    val.id = `ratio-val-${lv}`;
+    val.textContent = ratios[lv] + '%';
+    slider.addEventListener('input', e => {
+      ratios[lv] = parseInt(e.target.value);
+      val.textContent = ratios[lv] + '%';
+      updateRatioBar();
+    });
+    grid.append(labelSpan, slider, val);
+  }
+  updateRatioBar();
+}
+
+document.addEventListener('DOMContentLoaded', initUI);
+</script>
+</body>
+</html>
